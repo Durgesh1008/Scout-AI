@@ -1,0 +1,10 @@
+{
+  "name": "Scout AI",
+  "short_name": "ScoutAI",
+  "description": "Personal AI Agent with job hunting, chat, and productivity features",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "any"
+}

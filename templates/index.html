@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Scout AI — Personal Autonomous Agent</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link href="/static/style.css?v=5.2" rel="stylesheet">
+  <link rel="manifest" href="/static/manifest.json">
+</head>
+<body>
+<div id="app" class="layout">
+  <!-- Mobile header -->
+  <div class="mobile-header d-lg-none">
+    <div class="brand-mobile">
+      <span class="brand-mark-sm">⚡</span>
+      <span class="brand-name">Scout AI</span>
+    </div>
+    <button class="menu-btn" id="menu-toggle"><i class="bi bi-list"></i></button>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark">⚡</span>
+      <div><strong>Scout AI</strong><small class="muted">Personal Agent</small></div>
+    </div>
+    <nav class="nav-section">
+      <div class="nav-label">MENU</div>
+      <a href="#chat" class="nav-link" data-section="chat"><i class="bi bi-chat-dots"></i><span>AI Assistant</span></a>
+      <a href="#jobs" class="nav-link" data-section="jobs"><i class="bi bi-briefcase"></i><span>Job Hunter</span></a>
+      <a href="#resume" class="nav-link" data-section="resume"><i class="bi bi-file-earmark-person"></i><span>Resume Profile</span></a>
+      <a href="#tasks" class="nav-link" data-section="tasks"><i class="bi bi-check2-square"></i><span>Todo List</span></a>
+      <a href="#habits" class="nav-link" data-section="habits"><i class="bi bi-calendar-check"></i><span>Habits</span></a>
+      <a href="#briefing" class="nav-link" data-section="briefing"><i class="bi bi-sun"></i><span>Daily Briefing</span></a>
+    </nav>
+    <nav class="nav-section mt-3">
+      <div class="nav-label">SYSTEM</div>
+      <a href="#activity" class="nav-link" data-section="activity"><i class="bi bi-activity"></i><span>Agent Activity</span></a>
+      <a href="#settings" class="nav-link" data-section="settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="status-row">
+        <span class="status-dot green"></span>
+        <span id="model-label">● {{ model }}</span>
+      </div>
+      <div class="text-truncate small text-primary mt-1" style="cursor:pointer;" onclick="navigateTo('resume')" title="Active Resume: {{ active_resume.name }} (Click to manage)">
+        <i class="bi bi-file-earmark-person"></i> {{ active_resume.name }} <i class="bi bi-pencil-square ms-1" style="font-size:10px;"></i>
+      </div>
+      <div class="muted small mt-1">Local · {{ total_jobs }} jobs tracked</div>
+    </div>
+  </aside>
+
+  <!-- Overlay for mobile -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- CHAT SECTION -->
+    <section class="view active" id="view-chat">
+      <div class="chat-container">
+        <div class="chat-header">
+          <div>
+            <h1>AI Assistant</h1>
+            <p class="muted">Ultra-fast personal agent powered by Google Gemini</p>
+          </div>
+          <button class="btn btn-outline-light btn-sm" onclick="clearChat()"><i class="bi bi-trash"></i> Clear</button>
+        </div>
+        <div class="quick-actions">
+          <span class="muted small me-2">Quick actions:</span>
+          <button class="btn btn-sm btn-outline-secondary" onclick="quickAction('find jobs')"><i class="bi bi-briefcase"></i> Find jobs</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="quickAction('show my saved jobs')"><i class="bi bi-list-ul"></i> My jobs</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="quickAction('generate daily briefing')"><i class="bi bi-sun"></i> Briefing</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="quickAction('add todo: solve 2 LeetCode problems')"><i class="bi bi-plus-circle"></i> Add todo</button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+          <div class="welcome-card" id="welcome-card">
+            <div class="welcome-icon">⚡</div>
+            <h3>Hi there! I'm Scout.</h3>
+            <p class="muted mb-3">I'm your personal autonomous agent. How can I assist you right now?</p>
+            <ul class="feature-list text-start">
+              <li><strong>Job Hunting</strong> — fetch, deduplicate, and match 50-70+ jobs against your resume</li>
+              <li><strong>Outreach</strong> — generate tailored cold emails directly into your Gmail Drafts</li>
+              <li><strong>Productivity</strong> — manage your daily todos, habit protocol, and morning plan</li>
+            </ul>
+            <p class="muted small mt-3">Try: "Find jobs", "Add todo: prepare system design", or "Generate briefing"</p>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <form class="chat-form" id="chat-form" onsubmit="sendChat(event)">
+            <textarea id="chat-input" placeholder="Type a message or command... (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
+            <button type="submit" class="btn btn-primary btn-send" id="send-btn"><i class="bi bi-arrow-up"></i></button>
+          </form>
+          <div class="chat-hint"><i class="bi bi-lightning-charge-fill text-warning"></i> Fast response powered by Gemini & local intent engine</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- JOBS SECTION -->
+    <section class="view" id="view-jobs">
+      <div class="jobs-container">
+        <!-- SLEEK ACTIVE RESUME BADGE STRIP -->
+        <div class="active-resume-strip mb-3">
+          <div class="active-resume-pill-card">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="active-pulse" title="Profile Active & Matching"></span>
+              <span class="resume-pill-title">Active Profile:</span>
+              <span class="active-resume-filename" id="job-active-resume-name">
+                <i class="bi bi-file-earmark-pdf-fill text-danger"></i> {{ active_resume.name }}
+              </span>
+              <span class="badge bg-secondary-subtle text-info border border-secondary d-none d-md-inline" id="job-active-exp">
+                {{ active_resume.experience_level }}
+              </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-sm btn-outline-primary" onclick="navigateTo('resume')" title="Go to dedicated Resume Profile to view skills or upload another CV">
+                <i class="bi bi-pencil-square"></i> Change Resume
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="rescoreJobs()" title="Re-calculate match scores for all jobs based on active resume">
+                <i class="bi bi-arrow-repeat"></i> Re-Score
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h1 class="mb-1">Job Hunter</h1>
+            <p class="muted">Jobs matched for <strong>3-month internship / entry level</strong> (India & Remote prioritized on top)</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="huntJobs()"><i class="bi bi-search"></i> Find New Jobs</button>
+          </div>
+        </div>
+
+        <div class="search-filters">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <input type="text" class="form-control" id="job-search" placeholder="Search by title, company, skills...">
+            </div>
+            <div class="col-md-2">
+              <select class="form-select" id="job-role-filter">
+                <option value="" selected>All Roles</option>
+                <option value="intern">🎓 Intern / Fresher</option>
+                <option value="fullstack">⚡ Full Stack</option>
+                <option value="frontend">🎨 Frontend</option>
+                <option value="backend">⚙️ Backend</option>
+                <option value="aiml">🤖 AI / ML</option>
+                <option value="web">🌐 Web Dev</option>
+                <option value="mobile">📱 Mobile Dev</option>
+                <option value="devops">☁️ DevOps / Cloud</option>
+                <option value="software">💻 Software Eng</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <select class="form-select" id="job-location-filter">
+                <option value="india_remote" selected>🇮🇳 India & 🌐 Remote (Default)</option>
+                <option value="india_only">🇮🇳 India Only</option>
+                <option value="remote_only">🌐 Global Remote Only</option>
+                <option value="out_of_india">🌍 Out of India / Other</option>
+                <option value="all">All Locations</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <select class="form-select" id="job-status-filter">
+                <option value="">All Status</option>
+                <option value="New">New</option>
+                <option value="Interested">Interested</option>
+                <option value="Applied">Applied</option>
+                <option value="Interview">Interview</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Archived">Archived</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <select class="form-select" id="job-source-filter">
+                <option value="">All Sources ({{ total_jobs }})</option>
+                <option value="linkedin">LinkedIn (🇮🇳 India) ({{ source_counts.get('linkedin', 0) }})</option>
+                <option value="wellfound">Wellfound (Startups) ({{ source_counts.get('wellfound', 0) }})</option>
+                <option value="jsearch">JSearch (Aggregator) ({{ source_counts.get('jsearch', 0) }})</option>
+                <option value="himalayas">Himalayas (🚀 Startups) ({{ source_counts.get('himalayas', 0) }})</option>
+                <option value="weworkremotely">WeWorkRemotely ({{ source_counts.get('weworkremotely', 0) }})</option>
+                <option value="remotive">Remotive ({{ source_counts.get('remotive', 0) }})</option>
+                <option value="arbeitnow">Arbeitnow ({{ source_counts.get('arbeitnow', 0) }})</option>
+                <option value="jobicy">Jobicy ({{ source_counts.get('jobicy', 0) }})</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div id="job-message" class="alert alert-info mt-3" style="display:none;"></div>
+
+        <!-- 18-HOUR AUTO-CLEAN NOTICE -->
+        <div class="alert alert-dark border-secondary py-2 px-3 small d-flex flex-wrap align-items-center justify-content-between my-3 text-muted">
+          <span><i class="bi bi-clock-history text-warning me-2"></i><strong>18-Hour Auto-Clean (IST):</strong> Unreviewed listings automatically expire and clear every 18 hours. Change status to "Interested" or "Applied" to keep jobs saved.</span>
+          <span class="badge bg-dark border border-secondary text-info"><i class="bi bi-geo-alt"></i> Indian Standard Time (IST)</span>
+        </div>
+
+        <div id="job-list" class="job-list-container mt-2">
+          {% if jobs %}
+          {% for job in jobs %}
+          <div class="job-card" data-id="{{ job.id }}" data-title="{{ job.title|lower }}" data-company="{{ job.company|lower }}" data-source="{{ job.source }}" data-status="{{ job.status }}" data-location-category="{{ job.location_category }}" data-role="{{ job.roles_str }}" data-remote="{{ 'true' if job.location_category == 'remote' or 'remote' in job.location|lower else 'false' }}">
+            <div class="job-card-header">
+              <div class="company-avatar">{{ job.company[:1]|upper }}</div>
+              <div class="job-card-info">
+                <h5>{{ job.title }}</h5>
+                <p class="muted mb-1">
+                  <i class="bi bi-building"></i> {{ job.company }} ·
+                  {% if job.location_category == 'india' %}
+                  <span class="badge bg-success-subtle"><i class="bi bi-geo-alt-fill"></i> 🇮🇳 {{ job.location }}</span>
+                  {% elif job.location_category == 'remote' %}
+                  <span class="badge bg-info-subtle"><i class="bi bi-globe"></i> 🌐 Global Remote</span>
+                  {% else %}
+                  <span class="badge bg-secondary-subtle"><i class="bi bi-pin-map"></i> 🌍 {{ job.location }}</span>
+                  {% endif %}
+                </p>
+                <div class="job-card-meta">
+                  <span class="badge bg-{{ 'success' if job.status == 'New' else 'primary' if job.status == 'Interested' else 'info' if job.status == 'Applied' else 'warning' if job.status == 'Interview' else 'secondary' if job.status == 'Rejected' else 'dark' }}">{{ job.status }}</span>
+                  {% if job.source == 'linkedin' %}
+                  <span class="badge bg-primary text-white"><i class="bi bi-linkedin"></i> LinkedIn</span>
+                  {% elif job.source == 'wellfound' %}
+                  <span class="badge bg-danger text-white"><i class="bi bi-gem"></i> Wellfound</span>
+                  {% elif job.source == 'himalayas' %}
+                  <span class="badge bg-dark border border-info text-info"><i class="bi bi-rocket-takeoff"></i> Himalayas</span>
+                  {% elif job.source %}
+                  <span class="badge bg-dark border border-secondary text-light">{{ job.source|capitalize }}</span>
+                  {% endif %}
+                  <span class="badge bg-secondary-subtle text-info border border-secondary">{{ job.role_label }}</span>
+                  <span class="match-score"><i class="bi bi-bullseye"></i> {{ job.score }}% match</span>
+                  <span class="badge {{ 'bg-warning text-dark' if job.is_expiring_soon else 'bg-dark border border-secondary text-warning' }}" title="Auto-expires from database in {{ job.expires_in }}"><i class="bi bi-hourglass-split"></i> Expires in {{ job.expires_in }}</span>
+                  {% if job.recruiter_email %}
+                  <span class="badge bg-dark border border-secondary text-info"><i class="bi bi-envelope-at"></i> {{ job.recruiter_email }}</span>
+                  {% endif %}
+                  <small class="muted"><i class="bi bi-clock"></i> {{ job.ist_time }}</small>
+                </div>
+              </div>
+              <div class="job-card-actions">
+                <a href="{{ job.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right"></i> Open</a>
+                <button class="btn btn-sm btn-outline-success" onclick="makeDraft({{ job.id }})" title="Draft cold email into Gmail Drafts"><i class="bi bi-envelope-plus"></i> Draft</button>
+                <select class="form-select form-select-sm" onchange="updateJobStatus({{ job.id }}, this.value)" style="width:110px;">
+                  <option value="New" {{ 'selected' if job.status == 'New' }}>New</option>
+                  <option value="Interested" {{ 'selected' if job.status == 'Interested' }}>Interested</option>
+                  <option value="Applied" {{ 'selected' if job.status == 'Applied' }}>Applied</option>
+                  <option value="Interview" {{ 'selected' if job.status == 'Interview' }}>Interview</option>
+                  <option value="Rejected" {{ 'selected' if job.status == 'Rejected' }}>Rejected</option>
+                  <option value="Archived" {{ 'selected' if job.status == 'Archived' }}>Archived</option>
+                </select>
+              </div>
+            </div>
+            <p class="job-description text-muted small">{{ (job.description[:220] + '...') if job.description|length > 220 else job.description }}</p>
+          </div>
+          {% endfor %}
+          <div id="no-filter-results" class="empty-state text-center py-5" style="display:none;">
+            <i class="bi bi-funnel text-muted display-4"></i>
+            <h5 class="mt-3 text-light">No jobs match your selected filters</h5>
+            <p class="text-muted small">Try loosening your role, location, or source filter.</p>
+            <button class="btn btn-sm btn-outline-primary mt-2" onclick="resetJobFilters()">
+              <i class="bi bi-arrow-counterclockwise me-1"></i> Reset All Filters
+            </button>
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <i class="bi bi-briefcase display-1 text-muted"></i>
+            <h4>No jobs found yet</h4>
+            <p class="muted">Click "Find New Jobs" or upload a resume to match opportunities.</p>
+          </div>
+          {% endif %}
+        </div>
+        <div id="job-stats" class="text-muted small mt-3" style="display:none;">
+          Showing <span id="visible-count">0</span> of <span id="total-count">{{ total_jobs }}</span> jobs
+        </div>
+      </div>
+    </section>
+
+    <!-- RESUME PROFILE & MATCHING ENGINE SECTION -->
+    <section class="view" id="view-resume">
+      <div class="page-container">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+          <div>
+            <h1 class="mb-1">Resume & Candidate Profile</h1>
+            <p class="muted">Upload any resume to instantly parse technical skills and re-score matching tech opportunities.</p>
+          </div>
+          <button class="btn btn-primary" onclick="document.getElementById('dedicated-resume-input').click()">
+            <i class="bi bi-cloud-arrow-up"></i> Upload New Resume
+          </button>
+        </div>
+
+        <!-- Active Resume Hero Panel -->
+        <div class="panel resume-hero-panel mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+            <div class="d-flex align-items-start gap-3">
+              <div class="resume-icon-badge">
+                <i class="bi bi-file-earmark-person-fill"></i>
+              </div>
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                  <h3 class="mb-0 text-light fw-bold" id="resume-display-name">{{ active_resume.name }}</h3>
+                  <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Active for Matching</span>
+                </div>
+                <div class="text-muted mb-2">
+                  <span>Candidate Level:</span>
+                  <strong class="text-primary" id="resume-display-exp">{{ active_resume.experience_level }}</strong>
+                  <span class="mx-2">·</span>
+                  <span>Filtered for: <strong class="text-light">0-2 Yrs / Internship & Junior Tech Roles</strong></span>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                  <button class="btn btn-sm btn-outline-info" onclick="rescoreJobs()">
+                    <i class="bi bi-arrow-repeat"></i> Re-Score Jobs for this Resume
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="navigateTo('jobs')">
+                    <i class="bi bi-briefcase"></i> View Matched Jobs
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="resume-stats-pill p-3 rounded border border-secondary text-center">
+              <div class="text-muted small">MATCHED OPPORTUNITIES</div>
+              <div class="fs-3 fw-bold text-success">{{ total_jobs }}</div>
+              <div class="text-muted small">India & Remote Tech Jobs</div>
+            </div>
+          </div>
+
+          <!-- Extracted Technical Skills -->
+          <div class="mt-4 pt-3 border-top border-secondary">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0 text-light"><i class="bi bi-stars text-warning me-2"></i>Extracted Technical Skills:</h6>
+              <span class="text-muted small" id="resume-skills-count">{{ active_resume.skills|length }} skills identified</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2" id="resume-skills-cloud">
+              {% for skill in active_resume.skills %}
+              <span class="badge bg-dark border border-secondary text-light px-3 py-2 fs-6">
+                <i class="bi bi-code-slash text-info me-1"></i> {{ skill }}
+              </span>
+              {% else %}
+              <span class="text-muted">No skills parsed yet. Upload a resume below to parse automatically.</span>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <!-- Upload Box -->
+          <div class="col-lg-6">
+            <div class="panel h-100">
+              <h5 class="mb-2"><i class="bi bi-cloud-arrow-up text-primary me-2"></i>Upload Candidate Resume</h5>
+              <p class="text-muted small mb-3">
+                Upload any candidate's resume (PDF, DOCX, TXT). Scout-AI automatically extracts technical skills, calculates match percentages, and prioritizes India & Remote opportunities.
+              </p>
+
+              <div class="resume-dropzone" id="resume-dropzone-box" onclick="document.getElementById('dedicated-resume-input').click()">
+                <input type="file" id="dedicated-resume-input" style="display:none" accept=".pdf,.docx,.txt" onchange="handleDedicatedResumeUpload(event)">
+                <i class="bi bi-file-earmark-arrow-up display-4 text-primary mb-2"></i>
+                <div class="fw-semibold text-light mb-1">Click or Drag & Drop Resume File Here</div>
+                <div class="text-muted small">Supports PDF, DOCX, and TXT (Max 15MB)</div>
+              </div>
+
+              <div id="dedicated-upload-status" class="mt-3" style="display:none;"></div>
+            </div>
+          </div>
+
+          <!-- Resumes in System Library -->
+          <div class="col-lg-6">
+            <div class="panel h-100">
+              <h5 class="mb-2"><i class="bi bi-folder2-open text-warning me-2"></i>Available Resumes Library</h5>
+              <p class="text-muted small mb-3">
+                Switch between different candidate profiles anytime. Scout-AI instantly recalibrates job match rankings.
+              </p>
+
+              <div class="resume-library-list">
+                {% if available_resumes %}
+                {% for r in available_resumes %}
+                <div class="resume-library-card {{ 'active-resume-card' if r.active else '' }} p-3 mb-2 rounded border border-secondary d-flex justify-content-between align-items-center">
+                  <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-file-earmark-pdf fs-2 {{ 'text-danger' if r.active else 'text-muted' }}"></i>
+                    <div>
+                      <div class="fw-bold text-light mb-0">{{ r.name }}</div>
+                      <small class="text-muted">{{ r.size_kb }} KB</small>
+                      {% if r.active %}
+                      <span class="badge bg-success ms-2"><i class="bi bi-check-lg"></i> Active</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                  <div>
+                    {% if not r.active %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="switchResume('{{ r.path }}')">
+                      <i class="bi bi-arrow-repeat"></i> Set Active
+                    </button>
+                    {% else %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2">Current</span>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-muted text-center py-4">No resumes found in system yet.</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TODOS / TASKS SECTION -->
+    <section class="view" id="view-tasks">
+      <div class="page-container">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h1 class="mb-1">Todo List</h1>
+            <p class="muted">Manage and track your daily priorities</p>
+          </div>
+          <button class="btn btn-outline-secondary btn-sm" onclick="clearCompletedTodos()">
+            <i class="bi bi-check2-all"></i> Clear Completed
+          </button>
+        </div>
+
+        <div class="panel mb-4">
+          <form class="task-form" onsubmit="addTodo(event)">
+            <input class="form-control form-control-lg" id="todo-input" placeholder="What needs to be done today? (e.g. Solve 2 LeetCode problems)" autofocus>
+            <button class="btn btn-primary px-4"><i class="bi bi-plus-lg"></i> Add</button>
+          </form>
+          <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary small text-muted">
+            <div id="todo-counter">Loading todos...</div>
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-outline-secondary active" id="filter-all" onclick="filterTodos('all')">All</button>
+              <button type="button" class="btn btn-outline-secondary" id="filter-pending" onclick="filterTodos('pending')">Pending</button>
+              <button type="button" class="btn btn-outline-secondary" id="filter-completed" onclick="filterTodos('completed')">Completed</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="todo-list" class="task-list">
+          {% for task in tasks %}
+          <div class="task-item {{ 'completed' if task.completed }}" data-id="{{ task.id }}" data-completed="{{ 'true' if task.completed else 'false' }}">
+            <label class="form-check mb-0">
+              <input class="form-check-input todo-check" type="checkbox" {% if task.completed %}checked{% endif %} onchange="toggleTodo({{ task.id }}, this.checked)">
+              <span class="form-check-label {{ 'text-decoration-line-through text-muted' if task.completed }}">{{ task.title }}</span>
+            </label>
+            <button class="btn btn-sm btn-outline-danger btn-delete" onclick="deleteTodo({{ task.id }})" title="Delete todo"><i class="bi bi-trash"></i></button>
+          </div>
+          {% else %}
+          <div class="empty-state" id="empty-todo-state"><i class="bi bi-check2-square display-3 text-muted"></i><p>No todos yet. Add your first goal above!</p></div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <!-- HABITS SECTION -->
+    <section class="view" id="view-habits">
+      <div class="page-container">
+        <h1 class="mb-4">Habits</h1>
+        <div class="panel">
+          <p class="muted mb-3">Today's progress: <strong id="habit-progress">{{ habits|selectattr('completed')|list|length }}/{{ habits|length }}</strong></p>
+          <div class="progress mb-3" style="height:8px;"><div class="progress-bar bg-success" role="progressbar" style="width:{{ (habits|selectattr('completed')|list|length / habits|length * 100)|round if habits|length > 0 else 0 }}%"></div></div>
+          <div class="habit-list">
+            {% for habit in habits %}
+            <div class="habit-item" data-id="{{ habit.id }}">
+              <div class="form-check">
+                <input class="form-check-input habit-check" type="checkbox" {% if habit.completed %}checked{% endif %} onchange="toggleHabit({{ habit.id }}, this.checked)">
+                <label class="form-check-label {{ 'text-decoration-line-through text-muted' if habit.completed }}">{{ habit.habit }}</label>
+              </div>
+              {% if habit.completed %}<span class="badge bg-success ms-2"><i class="bi bi-check-lg"></i></span>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BRIEFING SECTION -->
+    <section class="view" id="view-briefing">
+      <div class="page-container">
+        <h1 class="mb-4">Daily Morning Briefing</h1>
+        <div class="panel">
+          <button class="btn btn-primary btn-lg" onclick="makeBriefing()"><i class="bi bi-sun"></i> Generate Executive Briefing</button>
+          <p class="muted mt-2">Synthesizes your top 5 priorities, high-match job targets, and daily habits with AI.</p>
+        </div>
+        <div id="briefing-output" class="panel mt-3" style="display:none;white-space:pre-wrap;"></div>
+      </div>
+    </section>
+
+    <!-- ACTIVITY SECTION -->
+    <section class="view" id="view-activity">
+      <div class="page-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h1 class="mb-0">Agent Activity Logs</h1>
+          <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+        </div>
+        <div id="activity-list">
+          {% for run in runs %}
+          <div class="activity-item">
+            <span class="status-dot {{ 'red' if run.status != 'success' else 'green' }}"></span>
+            <div class="activity-info">
+              <strong>{{ run.agent }}</strong>
+              <span class="muted small">{{ run.summary }}</span>
+            </div>
+            <small class="text-muted">{{ run.created_at.strftime('%d %b %Y %H:%M') if run.created_at else '' }}</small>
+          </div>
+          {% else %}
+          <div class="empty-state"><i class="bi bi-activity"></i><p>No activity recorded yet.</p></div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS SECTION -->
+    <section class="view" id="view-settings">
+      <div class="page-container">
+        <h1 class="mb-4">Settings & Profile</h1>
+
+        <div class="panel mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h5 class="mb-1"><i class="bi bi-file-earmark-person text-primary me-2"></i>Active Resume Profile</h5>
+              <p class="text-muted small mb-0">Active: <strong class="text-light">{{ active_resume.name }}</strong> ({{ active_resume.experience_level }})</p>
+            </div>
+            <button class="btn btn-outline-primary btn-sm" onclick="navigateTo('resume')">
+              <i class="bi bi-gear"></i> Open Resume Manager
+            </button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h5>System Diagnostics & Status</h5>
+          <ul class="list-unstyled mb-0">
+            <li class="py-2 border-bottom border-secondary"><strong>Configured LLM:</strong> <span class="badge bg-primary-subtle text-primary ms-2">{{ model }}</span></li>
+            <li class="py-2 border-bottom border-secondary"><strong>Total Jobs Tracked:</strong> <span class="badge bg-secondary ms-2">{{ total_jobs }}</span></li>
+            <li class="py-2 border-bottom border-secondary"><strong>New Unreviewed Jobs:</strong> <span class="badge bg-success ms-2">{{ new_jobs }}</span></li>
+            <li class="py-2 border-bottom border-secondary"><strong>Active Plugins:</strong> <span class="badge bg-info ms-2">{{ plugins|length }}</span></li>
+            <li class="py-2"><strong>Telegram Bot:</strong> <span class="badge bg-success ms-2">@sccoout_bot Active</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="app-toast" class="toast" role="alert">
+    <div class="toast-body" id="toast-text"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/app.js?v=5.2"></script>
+</body>
+</html>
