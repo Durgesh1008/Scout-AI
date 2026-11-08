@@ -51,6 +51,17 @@ class AgentRun(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+class UserResume(Base):
+    __tablename__ = "user_resumes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
+    filename: Mapped[str] = mapped_column(String(250))
+    filepath: Mapped[str] = mapped_column(String(500))
+    skills: Mapped[str] = mapped_column(Text, default="[]")
+    experience_level: Mapped[str] = mapped_column(String(100), default="Entry Level")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 

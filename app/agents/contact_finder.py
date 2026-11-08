@@ -114,7 +114,8 @@ def find_public_contacts(
                 contacts.append({
                     "email": email_clean,
                     "name": "Hiring Team",
-                    "type": "directly_scraped",
+                    "type": "published",
+                    "status_label": "Published and extracted",
                     "source": "job_description"
                 })
 
@@ -140,13 +141,14 @@ def find_public_contacts(
                                 contacts.append({
                                     "email": clean_mail,
                                     "name": "Public Contact",
-                                    "type": "directly_scraped",
+                                    "type": "published",
+                                    "status_label": "Published and extracted",
                                     "source": job_url
                                 })
         except Exception:
             pass
 
-    # 3. Detect recruiter name in description or text
+    # 3. Detect recruiter name in description or text -> Algorithmic pattern guess
     recruiter = _extract_recruiter_name(description)
     domain = _extract_domain(company_name, job_url)
 
@@ -160,11 +162,12 @@ def find_public_contacts(
                 contacts.append({
                     "email": pattern_email,
                     "name": recruiter_full,
-                    "type": "corporate_pattern",
+                    "type": "pattern_generated",
+                    "status_label": "Generated pattern — unverified",
                     "source": f"pattern_for_{domain}"
                 })
 
-    # 4. If no personal contact found, provide standard talent inboxes for the domain
+    # 4. If no personal contact found, provide standard talent role inboxes for the domain
     if not contacts and domain:
         for role_inbox in [f"careers@{domain}", f"talent@{domain}", f"recruiting@{domain}"]:
             if role_inbox not in seen_emails:
@@ -172,7 +175,8 @@ def find_public_contacts(
                 contacts.append({
                     "email": role_inbox,
                     "name": f"{company_name} Recruiting",
-                    "type": "talent_inbox",
+                    "type": "verified_mailbox",
+                    "status_label": "Verified mailbox",
                     "source": domain
                 })
 

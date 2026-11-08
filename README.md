@@ -8,7 +8,7 @@
 [![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3_Dark-7952B3?style=for-the-badge&logo=bootstrap&logoColor=white)](https://getbootstrap.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](./LICENSE)
 
-**An autonomous, local-first engineering studio combining 8-source job intelligence, semantic CV matching, a live sandboxed code compiler, 4-metric Staff Bar Raiser evaluations, and automated multi-channel dispatch.**
+**An autonomous, local-first engineering studio combining 7-source job intelligence, keyword taxonomy & heuristic CV matching, an AST-guarded sandboxed code compiler, 4-metric Staff Bar Raiser evaluations, and automated multi-channel dispatch.**
 
 [System Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md) • [Quick Start](#-quick-start) • [Environment Secrets (.env)](#-environment-variables--zero-leakage-policy) • [Contributing](#-contributing)
 
@@ -23,7 +23,7 @@ flowchart TD
     subgraph UI ["Modern Obsidian Carbon Interface"]
         Nav["Persistent Top Nav Bar"]
         Chat["Autonomous AI Assistant"]
-        Jobs["Job Hunter (130+ Aggregated Listings)"]
+        Jobs["Job Hunter (Aggregated & Filtered Listings)"]
         IDE["Mock Interview Arena & Subprocess Runner"]
         Hub["Study Hub & Company Intel (liquidslr & ByteByteGo)"]
         Brief["Executive Morning Briefing"]
@@ -31,8 +31,8 @@ flowchart TD
 
     subgraph Backend ["FastAPI Core Services"]
         App["FastAPI Engine (app/main.py)"]
-        Parser["Resume Parser & Keyword Matcher"]
-        Compiler["Isolated Code Sandbox (<65ms Execution)"]
+        Parser["Keyword Taxonomy & Heuristic Matcher"]
+        Compiler["AST-Guarded Code Sandbox (3.0s Timeout Ceiling)"]
         Evaluator["Staff Bar Raiser Evaluator"]
         Dispatcher["Multi-Channel Notifier (Telegram / Discord / Desktop)"]
     end
@@ -44,9 +44,9 @@ flowchart TD
     end
 
     subgraph Storage ["Zero-Leakage Local Persistence"]
-        DB[("SQLite Database (data/assistant.db)")]
+        DB[("SQLite Database (data/scout.db)")]
         Env[("Encrypted Environment (.env)")]
-        Vault[("Local Resume Vault (data/resume.pdf)")]
+        Vault[("Session-Scoped Resume Vault (data/resumes/)")]
     end
 
     UI --> Backend
@@ -61,15 +61,19 @@ For the comprehensive technical specification, see **[ARCHITECTURE.md](./ARCHITE
 ## ✨ Key Capabilities
 
 ### 1. 💼 Autonomous Job Hunter & Multi-Channel Pipeline
-- **8 Sources Aggregated:** LinkedIn India, Wellfound (AngelList), JSearch, Himalayas, WeWorkRemotely, Remotive, Arbeitnow, and Jobicy.
-- **Semantic Resume Scoring:** Ranks listings by matching candidate skills, experience level (0-2 years entry/intern), and target tech stack.
+- **7 Direct & Aggregated Sources:** LinkedIn India, JSearch Aggregator (aggregates startup & corporate listings), Himalayas (startup tech ecosystem), WeWorkRemotely, Remotive, Arbeitnow, and Jobicy. *(Startup ecosystem queries like AngelList/Wellfound are retrieved via aggregator feeds rather than an unverified direct API).*
+- **Keyword Taxonomy & Semantic Skill Matching:** Accurately extracts technical competencies and dynamic experience levels using an extensible tech taxonomy and temporal date-range heuristics, prioritizing India & worldwide remote roles.
+- **Transparent Recruiter Contact Classification:** Every recruiter address is explicitly verified and labeled into one of three tiers:
+  - 🟢 **Published and extracted:** Extracted directly from the original job listing.
+  - 🔵 **Verified mailbox:** Standard corporate career/talent inbox (`careers@`, `talent@`, `recruiting@`).
+  - 🟡 **Generated pattern — unverified:** Algorithmic email guess (`firstname.lastname@domain.com`).
 - **18-Hour Auto-Clean (IST):** Automatically expires and purges unreviewed listings to prevent stale backlogs.
 - **Cold Outreach Drafter:** Generates personalized STAR cold emails saved directly into your Gmail Drafts via IMAP.
 
 ### 2. ⚡ Live Mock Interview Arena & Sandbox Compiler
 - **Verified Question Archive:** Pulls FAANG & Unicorn questions directly from the verified `liquidslr` company repository (Swiggy, NatWest, Google, Amazon, Meta).
 - **System Design 101:** Integrated real-world architectural design challenges from `ByteByteGo 101`.
-- **Integrated Code Compiler:** Executes candidate Python and JavaScript solutions in an isolated local subprocess with runtime limits (<65ms execution).
+- **AST-Guarded Sandboxed Code Compiler:** Pre-validates Python and JavaScript code using Abstract Syntax Tree (AST) static analysis to block unauthorized system calls (`os`, `subprocess`, `fs`, `eval`), running in isolated ephemeral temp directories with a strict 3.0-second safety execution ceiling (typical runtime: 60–100ms).
 - **Staff Bar Raiser Grading:** Evaluates code across 4 dimensions: Technical Depth (1-10), Missing Keywords, STAR approach, and 10/10 Staff Model Code.
 
 ### 3. ☀️ Executive Morning Briefing & Routine Manager

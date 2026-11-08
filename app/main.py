@@ -1,16 +1,18 @@
 import re
+import json
+import uuid
 import shutil
 from typing import Optional
 from pathlib import Path
 from datetime import date
-from fastapi import FastAPI, Request, Depends, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Request, Response, Depends, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config import ROOT, settings
-from app.database import init_db, get_db, Job, AgentRun, Task
+from app.database import init_db, get_db, Job, AgentRun, Task, UserResume
 from app.services.llm import generate, LLMError, check_connection
 from app.services.resume import extract_resume_text
 from app.agents.job_hunter import (
@@ -53,59 +55,143 @@ RESUMES_DIR = ROOT / "data" / "resumes"
 RESUMES_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_available_resumes():
-    """List all detected resume files across data/resumes, data/, and app/Resume/."""
+def get_session_id(request: Request) -> str:
+    """Extract or generate a secure, isolated session identifier for multi-user safety."""
+    session_id = request.cookies.get("scout_session_id")
+    if not session_id or not re.match(r"^[a-zA-Z0-9_-]{8,64}$", session_id):
+        session_id = uuid.uuid4().hex[:16]
+    return session_id
+
+
+def get_available_resumes(session_id: str = "default", db: Optional[Session] = None):
+    """List all resume files accessible to this user session."""
     resumes = []
     seen = set()
-    dirs = [RESUMES_DIR, ROOT / "app" / "Resume", ROOT / "data"]
 
+    # User's uploaded resumes from database
+    if db:
+        user_resumes = db.query(UserResume).filter_by(session_id=session_id).all()
+        for ur in user_resumes:
+            p = Path(ur.filepath)
+            if p.exists() and p.name.lower() not in seen:
+                seen.add(p.name.lower())
+                resumes.append({
+                    "name": ur.filename,
+                    "path": str(p.resolve()),
+                    "size_kb": round(p.stat().st_size / 1024, 1),
+                    "active": ur.is_active
+                })
+
+    # Public/Sample resumes fallback
+    dirs = [RESUMES_DIR / session_id, RESUMES_DIR, ROOT / "app" / "Resume", ROOT / "data"]
     for d in dirs:
         if d.exists():
             for f in d.iterdir():
                 if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}:
                     if f.name.lower() not in seen:
                         seen.add(f.name.lower())
-                        try:
-                            is_active = (
-                                Path(settings.resume_path).resolve() == f.resolve()
-                            )
-                        except Exception:
-                            is_active = False
-
                         resumes.append({
                             "name": f.name,
                             "path": str(f.resolve()),
                             "size_kb": round(f.stat().st_size / 1024, 1),
-                            "active": is_active
+                            "active": False if resumes else True
                         })
     return resumes
 
 
-def get_active_resume_profile():
-    """Get profile and parsed skills for the currently active resume."""
-    p = Path(settings.resume_path)
-    if not p.exists():
-        # Fallback to CV-Durgesh or resume.pdf if available
-        for candidate in [ROOT / "app" / "Resume" / "CV-Durgesh.pdf", ROOT / "data" / "resume.pdf"]:
-            if candidate.exists():
-                settings.resume_path = str(candidate)
-                p = candidate
-                break
+def get_active_resume_profile(session_id: str = "default", db: Optional[Session] = None):
+    """Get active resume profile scoped to this user session without mutating global state."""
+    if db:
+        user_res = db.query(UserResume).filter_by(session_id=session_id, is_active=True).first()
+        if user_res and Path(user_res.filepath).exists():
+            p = Path(user_res.filepath)
+            try:
+                text = extract_resume_text(str(p))
+                prof = parse_resume_profile(text)
+                return {
+                    "name": user_res.filename,
+                    "path": str(p),
+                    "skills": sorted(list(prof.get("skills", set()))),
+                    "experience_level": prof.get("experience_level", user_res.experience_level)
+                }
+            except Exception:
+                return {"name": user_res.filename, "path": str(p), "skills": [], "experience_level": user_res.experience_level}
 
-    if p.exists():
-        try:
-            text = extract_resume_text(str(p))
-            prof = parse_resume_profile(text)
-            return {
-                "name": p.name,
-                "path": str(p),
-                "skills": sorted(list(prof.get("skills", set()))),
-                "experience_level": prof.get("experience_level", "Unknown")
-            }
-        except Exception:
-            return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Unknown"}
+    # Fallback to configured resume or sample CV
+    candidates = [
+        Path(settings.resume_path),
+        ROOT / "app" / "Resume" / "CV-Durgesh.pdf",
+        ROOT / "data" / "resume.pdf"
+    ]
+    for p in candidates:
+        if p.exists():
+            try:
+                text = extract_resume_text(str(p))
+                prof = parse_resume_profile(text)
+                return {
+                    "name": p.name,
+                    "path": str(p),
+                    "skills": sorted(list(prof.get("skills", set()))),
+                    "experience_level": prof.get("experience_level", "Entry Level")
+                }
+            except Exception:
+                return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Entry Level"}
 
-    return {"name": "No Resume", "path": "", "skills": [], "experience_level": "None"}
+    return {"name": "No Resume", "path": "", "skills": [], "experience_level": "Upload CV"}
+
+
+def get_contact_badge(job: Job) -> Optional[dict]:
+    """
+    Transparently labels recruiter contact addresses into 3 distinct categories:
+    1. Published and extracted (found directly in description or application listing)
+    2. Verified mailbox (standard corporate talent inbox: careers@, talent@, recruiting@, etc.)
+    3. Generated pattern — unverified (algorithmic pattern guess from candidate/recruiter names)
+    """
+    if not job.recruiter_email:
+        return None
+    cs = (job.contact_source or "").lower()
+    email = job.recruiter_email.lower().strip()
+
+    # 1. Published and extracted (found in description, explicitly tagged published or directly_scraped)
+    if (
+        "published" in cs
+        or "directly_scraped" in cs
+        or "job_description" in cs
+        or (job.description and email in job.description.lower())
+    ):
+        return {
+            "type": "published",
+            "label": "Published and extracted",
+            "short_label": "Published",
+            "icon": "bi-patch-check-fill",
+            "badge_class": "badge-contact-published",
+            "tooltip": "Extracted directly from the original job listing"
+        }
+
+    # 2. Verified mailbox (standard corporate talent inbox: careers@, talent@, recruiting@, jobs@, hr@, intern-recruitment@)
+    if (
+        "verified_mailbox" in cs
+        or "talent_inbox" in cs
+        or any(email.startswith(p + "@") for p in ["careers", "talent", "recruiting", "jobs", "hiring", "intern-recruitment"])
+    ):
+        return {
+            "type": "verified_mailbox",
+            "label": "Verified mailbox",
+            "short_label": "Verified Mailbox",
+            "icon": "bi-inbox-fill",
+            "badge_class": "badge-contact-mailbox",
+            "tooltip": "Company career & talent inbox"
+        }
+
+    # 3. Generated pattern — unverified (e.g. firstname.lastname@company.com)
+    return {
+        "type": "pattern_generated",
+        "label": "Generated pattern — unverified",
+        "short_label": "Pattern (Unverified)",
+        "icon": "bi-question-diamond-fill",
+        "badge_class": "badge-contact-pattern",
+        "tooltip": "Algorithmic email pattern guess — not independently verified"
+    }
 
 
 @app.on_event("startup")
@@ -118,7 +204,10 @@ def startup():
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)):
+def dashboard(request: Request, response: Response, db: Session = Depends(get_db)):
+    session_id = get_session_id(request)
+    response.set_cookie(key="scout_session_id", value=session_id, max_age=31536000, httponly=True, samesite="lax")
+
     # Auto-cleanup expired unreviewed jobs (>18h IST)
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
     all_jobs = db.query(Job).all()
@@ -144,6 +233,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
         j.ist_time = time_meta["ist_str"]
         j.expires_in = time_meta["expires_in_str"]
         j.is_expiring_soon = time_meta["is_expiring_soon"]
+        j.contact_badge = get_contact_badge(j)
 
     habits = list_habits(db)
     tasks = db.query(Task).filter_by(day=date.today()).order_by(Task.id.desc()).all()
@@ -151,8 +241,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     total_jobs = db.query(Job).count()
     new_jobs = db.query(Job).filter_by(status="New").count()
 
-    active_resume = get_active_resume_profile()
-    available_resumes = get_available_resumes()
+    active_resume = get_active_resume_profile(session_id=session_id, db=db)
+    available_resumes = get_available_resumes(session_id=session_id, db=db)
 
     return templates.TemplateResponse(
         request,
@@ -177,30 +267,42 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 
 
 # -------------------------------------------------------------
-# RESUME MANAGEMENT ENDPOINTS
+# RESUME MANAGEMENT ENDPOINTS (MULTI-USER SESSION ISOLATED)
 # -------------------------------------------------------------
 
 @app.get("/api/resume/info")
-def resume_info():
-    """Get active resume details and skills."""
-    return get_active_resume_profile()
+def resume_info(request: Request, db: Session = Depends(get_db)):
+    """Get active resume details and skills for current user session."""
+    session_id = get_session_id(request)
+    return get_active_resume_profile(session_id=session_id, db=db)
 
 
 @app.get("/api/resumes")
-def list_resumes():
-    """List all uploaded resumes."""
-    return {"resumes": get_available_resumes()}
+def list_resumes(request: Request, db: Session = Depends(get_db)):
+    """List all resumes uploaded in this user session."""
+    session_id = get_session_id(request)
+    return {"resumes": get_available_resumes(session_id=session_id, db=db)}
 
 
 @app.post("/api/resume")
-async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Upload any candidate's resume, parse skills, and automatically re-score jobs."""
+async def upload_resume(
+    request: Request,
+    response: Response,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload candidate resume scoped to current user session, parse skills, and re-score jobs."""
+    session_id = get_session_id(request)
+    response.set_cookie(key="scout_session_id", value=session_id, max_age=31536000, httponly=True, samesite="lax")
+
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in {".pdf", ".docx", ".txt"}:
         raise HTTPException(400, "Please upload a valid PDF, DOCX, or TXT resume file.")
 
     safe_name = re.sub(r"[^a-zA-Z0-9_.-]+", "_", file.filename or f"resume{suffix}")
-    dest = RESUMES_DIR / safe_name
+    user_resumes_dir = RESUMES_DIR / session_id
+    user_resumes_dir.mkdir(parents=True, exist_ok=True)
+    dest = user_resumes_dir / safe_name
 
     content = await file.read()
     if len(content) > 15 * 1024 * 1024:
@@ -208,43 +310,69 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
 
     dest.write_bytes(content)
 
-    # Set as active resume
-    settings.resume_path = str(dest)
+    # Deactivate previous active resumes for this session
+    db.query(UserResume).filter_by(session_id=session_id).update({"is_active": False})
 
-    # Update .env if present
-    env_path = ROOT / ".env"
-    if env_path.exists():
-        lines = env_path.read_text(encoding="utf-8").splitlines()
-        updated = False
-        for idx, line in enumerate(lines):
-            if line.startswith("RESUME_PATH="):
-                lines[idx] = f"RESUME_PATH={dest}"
-                updated = True
-        if not updated:
-            lines.append(f"RESUME_PATH={dest}")
-        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # Parse and register new resume
+    text = extract_resume_text(str(dest))
+    prof = parse_resume_profile(text)
+    user_resume = UserResume(
+        session_id=session_id,
+        filename=safe_name,
+        filepath=str(dest),
+        skills=json.dumps(sorted(list(prof.get("skills", [])))),
+        experience_level=prof.get("experience_level", "Entry Level"),
+        is_active=True
+    )
+    db.add(user_resume)
+    db.commit()
 
-    # Automatically re-score existing jobs for this new resume
+    # Re-score existing jobs for this new resume without mutating global server state or writing to .env
     rescore_result = rescore_all_jobs(db, str(dest))
 
     return {
-        "message": f"Resume '{safe_name}' uploaded successfully!",
+        "message": f"Resume '{safe_name}' uploaded successfully for your session!",
         "filename": safe_name,
         "path": str(dest),
         "skills": rescore_result.get("skills", []),
-        "experience_level": rescore_result.get("experience_level", "Entry / Fresher"),
+        "experience_level": prof.get("experience_level", "Entry Level"),
         "jobs_rescored": rescore_result.get("jobs_rescored", 0)
     }
 
 
 @app.post("/api/resume/select")
-def select_active_resume(path: str = Form(...), db: Session = Depends(get_db)):
-    """Switch active resume to any existing file and re-score matching jobs."""
+def select_active_resume(
+    request: Request,
+    path: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Switch active resume for this session to any existing file and re-score matching jobs."""
+    session_id = get_session_id(request)
     file_path = Path(path)
     if not file_path.exists():
         raise HTTPException(404, "Resume file not found.")
 
-    settings.resume_path = str(file_path)
+    # Deactivate previous active resumes for this session
+    db.query(UserResume).filter_by(session_id=session_id).update({"is_active": False})
+
+    # Activate existing or register new
+    existing = db.query(UserResume).filter_by(session_id=session_id, filepath=str(file_path)).first()
+    if existing:
+        existing.is_active = True
+    else:
+        text = extract_resume_text(str(file_path))
+        prof = parse_resume_profile(text)
+        new_res = UserResume(
+            session_id=session_id,
+            filename=file_path.name,
+            filepath=str(file_path),
+            skills=json.dumps(sorted(list(prof.get("skills", [])))),
+            experience_level=prof.get("experience_level", "Entry Level"),
+            is_active=True
+        )
+        db.add(new_res)
+    db.commit()
+
     rescore_result = rescore_all_jobs(db, str(file_path))
 
     return {
@@ -256,9 +384,12 @@ def select_active_resume(path: str = Form(...), db: Session = Depends(get_db)):
 
 
 @app.post("/api/jobs/rescore")
-def trigger_rescore(db: Session = Depends(get_db)):
-    """Re-score all jobs against the current active resume."""
-    result = rescore_all_jobs(db)
+def trigger_rescore(request: Request, db: Session = Depends(get_db)):
+    """Re-score all jobs against the current active resume for this session."""
+    session_id = get_session_id(request)
+    profile = get_active_resume_profile(session_id=session_id, db=db)
+    resume_path = profile.get("path") if profile and profile.get("path") else None
+    result = rescore_all_jobs(db, resume_path)
     return result
 
 
@@ -395,9 +526,9 @@ def discover_contacts(job_id: int, db: Session = Depends(get_db)):
     contacts = find_public_contacts(job.company, job.url, job.description)
     if contacts:
         job.recruiter_email = contacts[0]["email"]
-        job.contact_source = contacts[0]["source"]
+        job.contact_source = contacts[0].get("type", contacts[0].get("source", ""))
         db.commit()
-    return {"contacts": contacts, "note": "Contacts derived from publicly listed addresses and corporate domain patterns."}
+    return {"contacts": contacts, "note": "Contacts categorized into: Published & Extracted, Generated Pattern (Unverified), or Verified Mailbox."}
 
 
 # -------------------------------------------------------------

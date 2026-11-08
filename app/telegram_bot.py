@@ -5,8 +5,9 @@ from pathlib import Path
 import requests
 from sqlalchemy.orm import Session
 
+import json
 from app.config import ROOT, settings
-from app.database import SessionLocal, Job
+from app.database import SessionLocal, Job, UserResume
 from app.services.resume import extract_resume_text
 from app.agents.job_hunter import (
     hunt_jobs,
@@ -74,26 +75,28 @@ def handle_document_upload(document: dict, chat_id: str, base_url: str, token: s
         # Download and persist
         dest_path = download_telegram_file(base_url, token, file_id, file_name)
 
-        # Update active resume path
-        settings.resume_path = str(dest_path)
+        session_id = f"tg_{chat_id}"
+        # Deactivate previous active resumes for this Telegram chat session
+        db.query(UserResume).filter_by(session_id=session_id).update({"is_active": False})
 
-        # Update .env
-        env_path = ROOT / ".env"
-        if env_path.exists():
-            lines = env_path.read_text(encoding="utf-8").splitlines()
-            updated = False
-            for idx, line in enumerate(lines):
-                if line.startswith("RESUME_PATH="):
-                    lines[idx] = f"RESUME_PATH={dest_path}"
-                    updated = True
-            if not updated:
-                lines.append(f"RESUME_PATH={dest_path}")
-            env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        # Parse skills and experience from uploaded resume
+        text = extract_resume_text(str(dest_path))
+        prof = parse_resume_profile(text)
+        user_res = UserResume(
+            session_id=session_id,
+            filename=file_name,
+            filepath=str(dest_path),
+            skills=json.dumps(sorted(list(prof.get("skills", [])))),
+            experience_level=prof.get("experience_level", "Entry / Fresher"),
+            is_active=True
+        )
+        db.add(user_res)
+        db.commit()
 
-        # Automatically re-score all jobs for this new resume
+        # Automatically re-score jobs for this user's resume without mutating global state
         rescore_res = rescore_all_jobs(db, str(dest_path))
         skills = rescore_res.get("skills", [])
-        exp = rescore_res.get("experience_level", "Entry / Fresher")
+        exp = prof.get("experience_level", "Entry / Fresher")
         rescored_count = rescore_res.get("jobs_rescored", 0)
 
         skills_bullets = "\n".join(f"• `{s}`" for s in skills[:12]) if skills else "• None automatically extracted"
@@ -143,7 +146,9 @@ def handle_command(text: str, chat_id: str) -> str:
             )
 
         elif cmd == "/resume":
-            p = Path(settings.resume_path)
+            session_id = f"tg_{chat_id}"
+            user_res = db.query(UserResume).filter_by(session_id=session_id, is_active=True).first()
+            p = Path(user_res.filepath) if user_res and Path(user_res.filepath).exists() else Path(settings.resume_path)
             if not p.exists():
                 return "📄 *No active resume found.* Simply attach and send any PDF/DOCX file here to set your resume!"
             try:

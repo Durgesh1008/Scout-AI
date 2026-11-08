@@ -251,7 +251,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
           <div>
             <h1 class="mb-1">Job Hunter</h1>
-            <p class="muted">Jobs matched for <strong>3-month internship / entry level</strong> (India & Remote prioritized on top)</p>
+            <p class="muted">Jobs matched for <strong id="job-header-tier">{{ active_resume.experience_level }}</strong> (India & Remote prioritized on top)</p>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-primary" onclick="huntJobs()"><i class="bi bi-search"></i> Find New Jobs</button>
@@ -353,8 +353,18 @@
                   <span class="job-tag job-tag-role"><i class="bi bi-mortarboard me-1"></i>{{ job.role_label }}</span>
                   <span class="match-score"><i class="bi bi-bullseye me-1"></i>{{ job.score }}% match</span>
                   <span class="job-tag job-tag-expiry" title="Auto-expires from database in {{ job.expires_in }}"><i class="bi bi-hourglass-split me-1 text-warning"></i>Expires in {{ job.expires_in }}</span>
-                  {% if job.recruiter_email %}
-                  <span class="job-tag job-tag-email" title="{{ job.recruiter_email }}"><i class="bi bi-envelope-at me-1"></i>{{ job.recruiter_email }}</span>
+                  {% if job.recruiter_email and job.contact_badge %}
+                  <span class="job-tag {{ job.contact_badge.badge_class }}" title="{{ job.contact_badge.label }}: {{ job.recruiter_email }} ({{ job.contact_badge.tooltip }})">
+                    <i class="bi {{ job.contact_badge.icon }} me-1"></i>
+                    <span class="badge-status-text">{{ job.contact_badge.short_label }}:</span>
+                    <span class="contact-email-addr">{{ job.recruiter_email }}</span>
+                  </span>
+                  {% elif job.recruiter_email %}
+                  <span class="job-tag badge-contact-pattern" title="Generated pattern — unverified: {{ job.recruiter_email }}">
+                    <i class="bi bi-question-diamond-fill me-1"></i>
+                    <span class="badge-status-text">Pattern (Unverified):</span>
+                    <span class="contact-email-addr">{{ job.recruiter_email }}</span>
+                  </span>
                   {% endif %}
                   <span class="job-tag job-tag-time"><i class="bi bi-clock me-1"></i>{{ job.ist_time }}</span>
                 </div>

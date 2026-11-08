@@ -380,16 +380,54 @@ def is_experience_eligible(title: str, desc: str, user_exp_months: int = 3) -> b
 
 def parse_resume_profile(resume_text: str) -> Dict[str, Any]:
     """
-    Extract technical skills, estimated experience, and role hints from resume text.
+    Extract technical skills, estimated experience, and role hints from resume text
+    using keyword taxonomy and temporal date range heuristics.
     """
     lower = resume_text.lower()
     extracted_skills = {skill for skill in TECH_TAXONOMY if re.search(rf"\b{re.escape(skill)}\b", lower)}
 
-    # Default to 3 months intern profile as specified by user
+    # 1. Look for explicit experience mentions (e.g. "2 years experience", "6 months internship")
+    month_match = re.search(r"(\d+)\s*(?:month|months)\s*(?:of)?\s*(?:internship|experience)", lower)
+    year_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:year|years)\s*(?:of)?\s*(?:experience)", lower)
+
+    estimated_months = 0
+    if month_match:
+        estimated_months = int(month_match.group(1))
+    elif year_match:
+        estimated_months = int(float(year_match.group(1)) * 12)
+
+    # 2. Date ranges heuristic: e.g., "2022 - 2024", "2023 - present"
+    current_year = datetime.now().year
+    date_ranges = re.findall(r"\b(201\d|202\d)\s*(?:-|–|to)\s*(201\d|202\d|present|current)\b", lower)
+    if date_ranges and estimated_months == 0:
+        total_range_years = 0
+        for start_y, end_y in date_ranges:
+            start_val = int(start_y)
+            end_val = current_year if end_y in ["present", "current"] else int(end_y)
+            diff = max(0, min(end_val - start_val, 10))
+            total_range_years = max(total_range_years, diff)
+        estimated_months = max(estimated_months, total_range_years * 12)
+
+    # 3. Determine calibrated experience level
+    is_intern = bool(re.search(r"\b(intern|internship|trainee|apprentice|student|b\.?tech|undergraduate)\b", lower))
+    is_senior = bool(re.search(r"\b(senior|lead|principal|architect|staff engineer)\b", lower))
+
+    if is_senior or estimated_months >= 48:
+        level = "4+ Years (Senior Engineer)"
+    elif estimated_months >= 24:
+        level = "2-4 Years (Mid-Level Developer)"
+    elif estimated_months >= 12:
+        level = "1-2 Years (Associate Engineer)"
+    elif is_intern or estimated_months > 0:
+        months_display = f"{estimated_months} Months" if estimated_months > 0 else "Entry Level"
+        level = f"{months_display} (Intern / Fresher)"
+    else:
+        level = "Entry Level (0-2 Years)"
+
     return {
         "skills": extracted_skills,
-        "estimated_months": 3,
-        "experience_level": "3 Months Intern (Entry Level)"
+        "estimated_months": estimated_months,
+        "experience_level": level
     }
 
 
@@ -814,14 +852,14 @@ def hunt_jobs(
     max_jobs = limit or settings.daily_job_limit
     threshold = settings.match_threshold
 
-    # Clean up expired jobs (>18h IST) and senior/ineligible roles
+    # Clean up expired jobs (>18h IST)
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
-    cleanup_ineligible_jobs(db, 3)
 
     try:
         resume_text = extract_resume_text(path)
         profile = parse_resume_profile(resume_text)
         resume_skills = profile["skills"]
+        exp_months = profile.get("estimated_months", 0)
     except Exception as e:
         return {
             "added": 0,
@@ -829,6 +867,8 @@ def hunt_jobs(
             "jobs": [],
             "skipped_no_match": 0
         }
+
+    cleanup_ineligible_jobs(db, exp_months)
 
     added_jobs = []
     errors = []
@@ -849,8 +889,8 @@ def hunt_jobs(
                 if not item:
                     continue
 
-                # 1. Experience & Tech Role Check (3-month intern friendly)
-                if not is_experience_eligible(item["title"], item["description"], 3):
+                # 1. Experience & Tech Role Check (calibrated to candidate level)
+                if not is_experience_eligible(item["title"], item["description"], exp_months):
                     skipped_no_match += 1
                     continue
 
@@ -885,7 +925,7 @@ def hunt_jobs(
                 if contacts:
                     recruiter_name = contacts[0].get("name", "")
                     recruiter_email = contacts[0].get("email", "")
-                    contact_source = contacts[0].get("source", "")
+                    contact_source = contacts[0].get("type", contacts[0].get("source", ""))
 
                 remote_flag = item.pop("remote", False)
                 job = Job(
@@ -935,8 +975,9 @@ def rescore_all_jobs(db: Session, resume_path: Optional[str] = None) -> dict:
         resume_text = extract_resume_text(path)
         profile = parse_resume_profile(resume_text)
         skills = profile["skills"]
+        exp_months = profile.get("estimated_months", 0)
 
-        cleanup_ineligible_jobs(db, 3)
+        cleanup_ineligible_jobs(db, exp_months)
 
         jobs = db.query(Job).all()
         for j in jobs:
@@ -955,7 +996,7 @@ def rescore_all_jobs(db: Session, resume_path: Optional[str] = None) -> dict:
             "success": True,
             "jobs_rescored": len(jobs),
             "skills": sorted(list(skills)),
-            "experience_level": "3 Months Intern / Entry Level",
+            "experience_level": profile.get("experience_level", "Entry Level"),
             "resume_name": Path(path).name
         }
     except Exception as e:

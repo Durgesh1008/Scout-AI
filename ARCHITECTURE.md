@@ -10,7 +10,7 @@
 
 **Scout-AI** is an autonomous, event-driven personal career intelligence studio and staff-level interview simulator. It combines high-throughput asynchronous job crawling, semantic resume matching, a sandboxed multi-language code execution runtime, a 4-dimension technical Bar Raiser evaluation engine, and automated multi-channel briefing dispatch (Telegram, Discord, Gmail, Desktop).
 
-Designed with strict zero-leakage security, the application maintains total separation between application code and runtime credentials via Pydantic environment validation (`.env`), persistent local SQLite storage with SQLAlchemy ORM, and sub-65ms local code execution.
+Designed with strict zero-leakage security, the application maintains total separation between application code and runtime credentials via Pydantic environment validation (`.env`), persistent local SQLite storage with SQLAlchemy ORM, and AST-guarded sandboxed local code execution.
 
 ```mermaid
 flowchart TD
@@ -70,7 +70,7 @@ flowchart TD
 
 ### 2.1 Workflow 1: Autonomous Job Hunter & Semantic Matcher
 
-The Job Hunter aggregates listings across 8 distinct sources (LinkedIn India, Wellfound, JSearch, Himalayas, WeWorkRemotely, Remotive, Arbeitnow, Jobicy), filters for 0-2 years entry-level / intern roles, deduplicates against the local database, scores candidate relevance using resume TF-IDF keyword heuristics and LLM evaluation, and enforces an 18-hour auto-clean lifecycle.
+The Job Hunter aggregates listings across 7 verified direct and aggregator sources (LinkedIn India, JSearch Aggregator, Himalayas, WeWorkRemotely, Remotive, Arbeitnow, Jobicy — with startup roles crawled via aggregator feeds), filters for calibrated entry-level / intern roles, deduplicates against the local database, scores candidate relevance using keyword taxonomy and temporal date-range heuristics, and enforces an 18-hour auto-clean lifecycle.
 
 ```mermaid
 sequenceDiagram
@@ -134,8 +134,8 @@ sequenceDiagram
     loop Code Testing & Validation
         Candidate->>Studio: Writes solution & clicks "Run Code (Ctrl+Enter)"
         Studio->>MockAPI: POST /api/mock/run_code (language, code, stdin)
-        MockAPI->>Runner: Spawn isolated sandbox process (timeout=6.0s)
-        Runner-->>MockAPI: stdout, stderr, execution time (<65ms)
+        MockAPI->>Runner: Spawn isolated sandbox process (AST check, timeout=3.0s)
+        Runner-->>MockAPI: stdout, stderr, execution time (~60-100ms)
         MockAPI-->>Studio: Render styled console terminal output
     end
 
@@ -247,9 +247,9 @@ flowchart TD
 
 | Command / Trigger | Action Performed | Backend Integration |
 | :--- | :--- | :--- |
-| **Attach Document** (`.pdf`, `.docx`) | Downloads attachment from Telegram API, saves to `data/resumes/`, updates `.env`, extracts skills, and re-scores all jobs. | `download_telegram_file` + `rescore_all_jobs` |
+| **Attach Document** (`.pdf`, `.docx`) | Downloads attachment from Telegram API, saves to session vault `data/resumes/tg_{chat_id}/`, updates `UserResume`, extracts skills, and re-scores jobs without touching `.env`. | `download_telegram_file` + `rescore_all_jobs` |
 | `/jobs` | Lists top matched jobs with India & Global Remote listings prioritized, match percentage badges, and direct application links. | `Job` query + `get_location_category` |
-| `/hunt` | Triggers autonomous crawl across 8 job boards (LinkedIn, Wellfound, Himalayas, etc.) and returns fresh matches. | `hunt_jobs(db)` |
+| `/hunt` | Triggers autonomous crawl across 7 verified direct and aggregator sources (LinkedIn, JSearch, Himalayas, etc.) and returns fresh matches. | `hunt_jobs(db)` |
 | `/resume` | Displays active resume filename, detected seniority level, and top 12 extracted technical skills. | `parse_resume_profile` |
 | `/prep` | Displays catalog of 5 core engineering roadmaps (System Design, Networking, Generative AI, MERN, DSA). | `PREP_TRACKS` |
 | `/prep <track>` | Shows curated study guide and 5-step roadmap for a track (e.g., `/prep systemdesign`). | `PREP_TRACKS[track_id]` |

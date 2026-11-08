@@ -1253,9 +1253,61 @@ a:hover {
   background: rgba(255, 255, 255, 0.04);
   color: #93c5fd;
   border-color: rgba(147, 197, 253, 0.2);
-  max-width: 220px;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Recruiter Contact Verification Status Badges */
+.badge-contact-published {
+  background: rgba(16, 185, 129, 0.12) !important;
+  color: #6ee7b7 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  font-weight: 500;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-contact-published .badge-status-text {
+  color: #34d399;
+  font-weight: 700;
+  margin-right: 3px;
+}
+
+.badge-contact-mailbox {
+  background: rgba(56, 189, 248, 0.12) !important;
+  color: #7dd3fc !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  font-weight: 500;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-contact-mailbox .badge-status-text {
+  color: #38bdf8;
+  font-weight: 700;
+  margin-right: 3px;
+}
+
+.badge-contact-pattern {
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #fcd34d !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  font-weight: 500;
+  max-width: 330px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge-contact-pattern .badge-status-text {
+  color: #fbbf24;
+  font-weight: 700;
+  margin-right: 3px;
 }
 
 .job-tag-time {
