@@ -1,4 +1,0 @@
-# Cloudflare Pages Proxy Configuration
-# Proxies all API requests and application routes directly to Render backend while edge-caching static assets
-/api/*  https://scout-ai-1-0gs9.onrender.com/api/:splat  200
-/*      https://scout-ai-1-0gs9.onrender.com/:splat      200
