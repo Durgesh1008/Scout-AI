@@ -1,57 +1,125 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#0d1117">
+  <meta name="theme-color" content="#07090e">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Scout AI — Personal Autonomous Agent</title>
+  <title>Scout AI — Premier Engineering & Career Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link href="/static/style.css?v=5.2" rel="stylesheet">
+  <link href="/static/style.css?v=9.0" rel="stylesheet">
   <link rel="manifest" href="/static/manifest.json">
 </head>
 <body>
 <div id="app" class="layout">
-  <!-- Mobile header -->
-  <div class="mobile-header d-lg-none">
-    <div class="brand-mobile">
-      <span class="brand-mark-sm">⚡</span>
-      <span class="brand-name">Scout AI</span>
+  <!-- Persistent Sticky Top Navigation Bar -->
+  <header class="top-nav-bar">
+    <div class="top-nav-left">
+      <button class="menu-btn d-xl-none" id="menu-toggle" aria-label="Toggle Navigation">
+        <i class="bi bi-list"></i>
+      </button>
+      <a href="#jobs" class="top-nav-brand nav-link" data-section="jobs">
+        <div class="brand-mark">⚡</div>
+        <div class="brand-text">
+          <span class="brand-title">SCOUT AI</span>
+          <span class="brand-tag">AUTONOMOUS STUDIO</span>
+        </div>
+      </a>
     </div>
-    <button class="menu-btn" id="menu-toggle"><i class="bi bi-list"></i></button>
-  </div>
+
+    <nav class="top-nav-tabs">
+      <a href="#chat" class="top-nav-pill nav-link" data-section="chat">
+        <i class="bi bi-chat-left-text"></i>
+        <span>Assistant</span>
+      </a>
+      <a href="#jobs" class="top-nav-pill nav-link active" data-section="jobs">
+        <i class="bi bi-briefcase"></i>
+        <span>Job Hunter</span>
+        <span class="top-nav-count">{{ total_jobs }}</span>
+      </a>
+      <a href="#interview" class="top-nav-pill nav-link" data-section="interview">
+        <i class="bi bi-terminal"></i>
+        <span>Mock Studio</span>
+        <span class="top-nav-badge ide">IDE</span>
+      </a>
+      <a href="#prep" class="top-nav-pill nav-link" data-section="prep">
+        <i class="bi bi-cpu"></i>
+        <span>Prep Lab</span>
+        <span class="top-nav-badge new">NEW</span>
+      </a>
+      <a href="#resume" class="top-nav-pill nav-link" data-section="resume">
+        <i class="bi bi-file-earmark-person"></i>
+        <span>Resume</span>
+      </a>
+      <a href="#tasks" class="top-nav-pill nav-link" data-section="tasks">
+        <i class="bi bi-check2-circle"></i>
+        <span>Todos</span>
+      </a>
+      <a href="#habits" class="top-nav-pill nav-link" data-section="habits">
+        <i class="bi bi-calendar4-week"></i>
+        <span>Habits</span>
+      </a>
+      <a href="#briefing" class="top-nav-pill nav-link" data-section="briefing">
+        <i class="bi bi-sun"></i>
+        <span>Briefing</span>
+      </a>
+    </nav>
+
+    <div class="top-nav-right">
+      <div class="status-capsule d-none d-md-flex">
+        <span class="status-dot-pulse"></span>
+        <span class="fw-semibold text-light" style="font-size: 11.5px;">Bar Raiser Active</span>
+      </div>
+      <div class="sidebar-profile-link top-profile-pill d-none d-xl-flex" onclick="navigateTo('resume')" title="Active Resume: {{ active_resume.name }}">
+        <i class="bi bi-file-earmark-pdf text-danger"></i>
+        <span class="text-truncate" style="max-width: 120px;">{{ active_resume.name }}</span>
+      </div>
+    </div>
+  </header>
 
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="brand">
-      <span class="brand-mark">⚡</span>
-      <div><strong>Scout AI</strong><small class="muted">Personal Agent</small></div>
+      <div class="brand-mark">⚡</div>
+      <div class="brand-title">
+        <strong>SCOUT AI</strong>
+        <span class="brand-badge">Autonomous Studio</span>
+      </div>
     </div>
     <nav class="nav-section">
-      <div class="nav-label">MENU</div>
-      <a href="#chat" class="nav-link" data-section="chat"><i class="bi bi-chat-dots"></i><span>AI Assistant</span></a>
-      <a href="#jobs" class="nav-link" data-section="jobs"><i class="bi bi-briefcase"></i><span>Job Hunter</span></a>
+      <div class="nav-label">WORKSPACE</div>
+      <a href="#chat" class="nav-link" data-section="chat"><i class="bi bi-chat-left-text"></i><span>AI Assistant</span></a>
+      <a href="#jobs" class="nav-link" data-section="jobs"><i class="bi bi-briefcase"></i><span>Job Hunter</span> <span class="badge bg-dark border border-secondary text-info ms-auto" style="font-size: 10px; font-family: monospace;">{{ total_jobs }}</span></a>
+      <a href="#interview" class="nav-link" data-section="interview"><i class="bi bi-terminal"></i><span>Mock Interview</span> <span class="badge bg-danger-subtle text-danger border border-danger ms-auto" style="font-size: 9px; letter-spacing:0.5px;">IDE</span></a>
+      <a href="#prep" class="nav-link" data-section="prep"><i class="bi bi-cpu"></i><span>Prep Lab</span> <span class="badge bg-primary-subtle text-primary border border-primary ms-auto" style="font-size: 9px; letter-spacing:0.5px;">NEW</span></a>
       <a href="#resume" class="nav-link" data-section="resume"><i class="bi bi-file-earmark-person"></i><span>Resume Profile</span></a>
-      <a href="#tasks" class="nav-link" data-section="tasks"><i class="bi bi-check2-square"></i><span>Todo List</span></a>
-      <a href="#habits" class="nav-link" data-section="habits"><i class="bi bi-calendar-check"></i><span>Habits</span></a>
+      <a href="#tasks" class="nav-link" data-section="tasks"><i class="bi bi-check2-circle"></i><span>Todo List</span></a>
+      <a href="#habits" class="nav-link" data-section="habits"><i class="bi bi-calendar4-week"></i><span>Habits</span></a>
       <a href="#briefing" class="nav-link" data-section="briefing"><i class="bi bi-sun"></i><span>Daily Briefing</span></a>
     </nav>
     <nav class="nav-section mt-3">
-      <div class="nav-label">SYSTEM</div>
+      <div class="nav-label">INTELLIGENCE & SYSTEM</div>
       <a href="#activity" class="nav-link" data-section="activity"><i class="bi bi-activity"></i><span>Agent Activity</span></a>
-      <a href="#settings" class="nav-link" data-section="settings"><i class="bi bi-gear"></i><span>Settings</span></a>
+      <a href="#settings" class="nav-link" data-section="settings"><i class="bi bi-sliders"></i><span>Settings</span></a>
     </nav>
     <div class="sidebar-footer">
-      <div class="status-row">
-        <span class="status-dot green"></span>
-        <span id="model-label">● {{ model }}</span>
+      <div class="status-capsule">
+        <span class="status-dot-pulse"></span>
+        <span id="model-label" class="fw-semibold text-light">Bar Raiser Active</span>
       </div>
-      <div class="text-truncate small text-primary mt-1" style="cursor:pointer;" onclick="navigateTo('resume')" title="Active Resume: {{ active_resume.name }} (Click to manage)">
-        <i class="bi bi-file-earmark-person"></i> {{ active_resume.name }} <i class="bi bi-pencil-square ms-1" style="font-size:10px;"></i>
+      <div class="sidebar-profile-link" onclick="navigateTo('resume')" title="Active Resume: {{ active_resume.name }} (Click to manage)">
+        <div class="d-flex align-items-center gap-2 text-truncate">
+          <i class="bi bi-file-earmark-pdf text-danger"></i>
+          <span class="text-truncate" style="max-width: 175px;">{{ active_resume.name }}</span>
+        </div>
+        <i class="bi bi-pencil" style="font-size: 11px;"></i>
       </div>
-      <div class="muted small mt-1">Local · {{ total_jobs }} jobs tracked</div>
+      <div class="text-muted small ps-1" style="font-size: 11px; font-family: monospace;">Local Node · {{ total_jobs }} jobs tracked</div>
     </div>
   </aside>
 
@@ -66,7 +134,7 @@
         <div class="chat-header">
           <div>
             <h1>AI Assistant</h1>
-            <p class="muted">Ultra-fast personal agent powered by Google Gemini</p>
+            <p class="muted">Ultra-fast personal agent powered by Bar Raiser AI</p>
           </div>
           <button class="btn btn-outline-light btn-sm" onclick="clearChat()"><i class="bi bi-trash"></i> Clear</button>
         </div>
@@ -79,15 +147,68 @@
         </div>
         <div class="chat-messages" id="chat-messages">
           <div class="welcome-card" id="welcome-card">
-            <div class="welcome-icon">⚡</div>
-            <h3>Hi there! I'm Scout.</h3>
-            <p class="muted mb-3">I'm your personal autonomous agent. How can I assist you right now?</p>
-            <ul class="feature-list text-start">
-              <li><strong>Job Hunting</strong> — fetch, deduplicate, and match 50-70+ jobs against your resume</li>
-              <li><strong>Outreach</strong> — generate tailored cold emails directly into your Gmail Drafts</li>
-              <li><strong>Productivity</strong> — manage your daily todos, habit protocol, and morning plan</li>
-            </ul>
-            <p class="muted small mt-3">Try: "Find jobs", "Add todo: prepare system design", or "Generate briefing"</p>
+            <div class="welcome-hero">
+              <div class="welcome-avatar-pulse">
+                <i class="bi bi-cpu-fill"></i>
+              </div>
+              <div class="welcome-hero-text">
+                <h3 class="mb-1 text-white">Scout Autonomous Command Center</h3>
+                <p class="text-secondary mb-0 small">Your high-velocity career agent & technical bar raiser. Select an action or type any command below.</p>
+              </div>
+            </div>
+
+            <div class="action-grid mt-3">
+              <div class="action-card" onclick="quickAction('find jobs')">
+                <div class="action-card-icon" style="background: rgba(16, 185, 129, 0.14); color: #10b981;">
+                  <i class="bi bi-briefcase"></i>
+                </div>
+                <div class="action-card-content">
+                  <h6>Match Tech Roles</h6>
+                  <p>Scan 130+ live openings against your active CV with instant match scoring.</p>
+                </div>
+                <i class="bi bi-arrow-right action-card-arrow"></i>
+              </div>
+
+              <div class="action-card" onclick="navigateTo('interview')">
+                <div class="action-card-icon" style="background: rgba(239, 68, 68, 0.14); color: #ef4444;">
+                  <i class="bi bi-terminal"></i>
+                </div>
+                <div class="action-card-content">
+                  <h6>Mock Interview Studio</h6>
+                  <p>Simulate FAANG rounds with real code execution & 4-metric Bar Raiser grading.</p>
+                </div>
+                <i class="bi bi-arrow-right action-card-arrow"></i>
+              </div>
+
+              <div class="action-card" onclick="navigateTo('prep')">
+                <div class="action-card-icon" style="background: rgba(6, 182, 212, 0.14); color: #06b6d4;">
+                  <i class="bi bi-cpu"></i>
+                </div>
+                <div class="action-card-content">
+                  <h6>Study Hub & Intel</h6>
+                  <p>Master 2026/2027 roadmaps, ByteByteGo 101, and verified company question archives.</p>
+                </div>
+                <i class="bi bi-arrow-right action-card-arrow"></i>
+              </div>
+
+              <div class="action-card" onclick="quickAction('generate daily briefing')">
+                <div class="action-card-icon" style="background: rgba(245, 158, 11, 0.14); color: #f59e0b;">
+                  <i class="bi bi-sun"></i>
+                </div>
+                <div class="action-card-content">
+                  <h6>Executive Briefing</h6>
+                  <p>Synthesize top 5 daily priorities, job targets, and habit tracking in one view.</p>
+                </div>
+                <i class="bi bi-arrow-right action-card-arrow"></i>
+              </div>
+            </div>
+
+            <div class="welcome-chips-bar mt-3">
+              <span class="chips-label small text-muted me-1">Popular prompts:</span>
+              <button type="button" class="welcome-chip" onclick="quickAction('Find React internships in India')">"Find React internships in India"</button>
+              <button type="button" class="welcome-chip" onclick="quickAction('Add todo: Solve LeetCode BFS problem')">"Add todo: BFS problem"</button>
+              <button type="button" class="welcome-chip" onclick="quickAction('Review my resume strengths')">"Review my resume"</button>
+            </div>
           </div>
         </div>
         <div class="chat-input-area">
@@ -95,7 +216,7 @@
             <textarea id="chat-input" placeholder="Type a message or command... (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
             <button type="submit" class="btn btn-primary btn-send" id="send-btn"><i class="bi bi-arrow-up"></i></button>
           </form>
-          <div class="chat-hint"><i class="bi bi-lightning-charge-fill text-warning"></i> Fast response powered by Gemini & local intent engine</div>
+          <div class="chat-hint"><i class="bi bi-lightning-charge-fill text-warning"></i> Fast response powered by Scout AI & local intent engine</div>
         </div>
       </div>
     </section>
@@ -112,8 +233,8 @@
               <span class="active-resume-filename" id="job-active-resume-name">
                 <i class="bi bi-file-earmark-pdf-fill text-danger"></i> {{ active_resume.name }}
               </span>
-              <span class="badge bg-secondary-subtle text-info border border-secondary d-none d-md-inline" id="job-active-exp">
-                {{ active_resume.experience_level }}
+              <span class="active-resume-tier-pill d-none d-md-inline" id="job-active-exp">
+                <i class="bi bi-stars text-warning me-1"></i>{{ active_resume.experience_level }}
               </span>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -206,51 +327,58 @@
             <div class="job-card-header">
               <div class="company-avatar">{{ job.company[:1]|upper }}</div>
               <div class="job-card-info">
-                <h5>{{ job.title }}</h5>
-                <p class="muted mb-1">
-                  <i class="bi bi-building"></i> {{ job.company }} ·
+                <h5 class="job-title">{{ job.title }}</h5>
+                <div class="job-company-row">
+                  <span class="company-name"><i class="bi bi-building me-1"></i>{{ job.company }}</span>
+                  <span class="dot-separator">·</span>
                   {% if job.location_category == 'india' %}
-                  <span class="badge bg-success-subtle"><i class="bi bi-geo-alt-fill"></i> 🇮🇳 {{ job.location }}</span>
+                  <span class="job-tag job-tag-location"><i class="bi bi-geo-alt-fill text-danger me-1"></i>🇮🇳 {{ job.location }}</span>
                   {% elif job.location_category == 'remote' %}
-                  <span class="badge bg-info-subtle"><i class="bi bi-globe"></i> 🌐 Global Remote</span>
+                  <span class="job-tag job-tag-location"><i class="bi bi-globe text-info me-1"></i>🌐 Global Remote</span>
                   {% else %}
-                  <span class="badge bg-secondary-subtle"><i class="bi bi-pin-map"></i> 🌍 {{ job.location }}</span>
+                  <span class="job-tag job-tag-location"><i class="bi bi-pin-map text-warning me-1"></i>🌍 {{ job.location }}</span>
                   {% endif %}
-                </p>
+                </div>
                 <div class="job-card-meta">
-                  <span class="badge bg-{{ 'success' if job.status == 'New' else 'primary' if job.status == 'Interested' else 'info' if job.status == 'Applied' else 'warning' if job.status == 'Interview' else 'secondary' if job.status == 'Rejected' else 'dark' }}">{{ job.status }}</span>
+                  <span class="job-tag job-status-{{ job.status|lower }}">{{ job.status }}</span>
                   {% if job.source == 'linkedin' %}
-                  <span class="badge bg-primary text-white"><i class="bi bi-linkedin"></i> LinkedIn</span>
+                  <span class="job-tag job-source-linkedin"><i class="bi bi-linkedin me-1"></i>LinkedIn</span>
                   {% elif job.source == 'wellfound' %}
-                  <span class="badge bg-danger text-white"><i class="bi bi-gem"></i> Wellfound</span>
+                  <span class="job-tag job-source-wellfound"><i class="bi bi-gem me-1"></i>Wellfound</span>
                   {% elif job.source == 'himalayas' %}
-                  <span class="badge bg-dark border border-info text-info"><i class="bi bi-rocket-takeoff"></i> Himalayas</span>
+                  <span class="job-tag job-source-himalayas"><i class="bi bi-rocket-takeoff me-1"></i>Himalayas</span>
                   {% elif job.source %}
-                  <span class="badge bg-dark border border-secondary text-light">{{ job.source|capitalize }}</span>
+                  <span class="job-tag job-source-default">{{ job.source|capitalize }}</span>
                   {% endif %}
-                  <span class="badge bg-secondary-subtle text-info border border-secondary">{{ job.role_label }}</span>
-                  <span class="match-score"><i class="bi bi-bullseye"></i> {{ job.score }}% match</span>
-                  <span class="badge {{ 'bg-warning text-dark' if job.is_expiring_soon else 'bg-dark border border-secondary text-warning' }}" title="Auto-expires from database in {{ job.expires_in }}"><i class="bi bi-hourglass-split"></i> Expires in {{ job.expires_in }}</span>
+                  <span class="job-tag job-tag-role"><i class="bi bi-mortarboard me-1"></i>{{ job.role_label }}</span>
+                  <span class="match-score"><i class="bi bi-bullseye me-1"></i>{{ job.score }}% match</span>
+                  <span class="job-tag job-tag-expiry" title="Auto-expires from database in {{ job.expires_in }}"><i class="bi bi-hourglass-split me-1 text-warning"></i>Expires in {{ job.expires_in }}</span>
                   {% if job.recruiter_email %}
-                  <span class="badge bg-dark border border-secondary text-info"><i class="bi bi-envelope-at"></i> {{ job.recruiter_email }}</span>
+                  <span class="job-tag job-tag-email" title="{{ job.recruiter_email }}"><i class="bi bi-envelope-at me-1"></i>{{ job.recruiter_email }}</span>
                   {% endif %}
-                  <small class="muted"><i class="bi bi-clock"></i> {{ job.ist_time }}</small>
+                  <span class="job-tag job-tag-time"><i class="bi bi-clock me-1"></i>{{ job.ist_time }}</span>
                 </div>
               </div>
               <div class="job-card-actions">
-                <a href="{{ job.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary"><i class="bi bi-box-arrow-up-right"></i> Open</a>
-                <button class="btn btn-sm btn-outline-success" onclick="makeDraft({{ job.id }})" title="Draft cold email into Gmail Drafts"><i class="bi bi-envelope-plus"></i> Draft</button>
-                <select class="form-select form-select-sm" onchange="updateJobStatus({{ job.id }}, this.value)" style="width:110px;">
-                  <option value="New" {{ 'selected' if job.status == 'New' }}>New</option>
-                  <option value="Interested" {{ 'selected' if job.status == 'Interested' }}>Interested</option>
-                  <option value="Applied" {{ 'selected' if job.status == 'Applied' }}>Applied</option>
-                  <option value="Interview" {{ 'selected' if job.status == 'Interview' }}>Interview</option>
-                  <option value="Rejected" {{ 'selected' if job.status == 'Rejected' }}>Rejected</option>
-                  <option value="Archived" {{ 'selected' if job.status == 'Archived' }}>Archived</option>
-                </select>
+                <a href="{{ job.url }}" target="_blank" rel="noopener" class="btn-job-action btn-job-open" title="Open official job post"><i class="bi bi-box-arrow-up-right me-1"></i>Open</a>
+                <button type="button" class="btn-job-action btn-job-prep" data-company="{{ job.company }}" data-title="{{ job.title }}" onclick="openCompanyPrep(this.dataset.company, this.dataset.title)" title="Interview rounds & repeated questions"><i class="bi bi-mortarboard me-1"></i>Prep</button>
+                <button type="button" class="btn-job-action btn-job-draft" onclick="makeDraft({{ job.id }})" title="Draft cold email into Gmail Drafts"><i class="bi bi-envelope-plus me-1"></i>Draft</button>
+                <div class="job-status-select-wrap">
+                  <select class="form-select job-status-dropdown" onchange="updateJobStatus({{ job.id }}, this.value)">
+                    <option value="New" {{ 'selected' if job.status == 'New' }}>New</option>
+                    <option value="Interested" {{ 'selected' if job.status == 'Interested' }}>Interested</option>
+                    <option value="Applied" {{ 'selected' if job.status == 'Applied' }}>Applied</option>
+                    <option value="Interview" {{ 'selected' if job.status == 'Interview' }}>Interview</option>
+                    <option value="Rejected" {{ 'selected' if job.status == 'Rejected' }}>Rejected</option>
+                    <option value="Archived" {{ 'selected' if job.status == 'Archived' }}>Archived</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <p class="job-description text-muted small">{{ (job.description[:220] + '...') if job.description|length > 220 else job.description }}</p>
+            <div class="job-description-box">
+              <i class="bi bi-lightning-charge-fill text-warning me-1 flex-shrink-0"></i>
+              <span class="job-description-text">{{ (job.description[:230] + '...') if job.description|length > 230 else job.description }}</span>
+            </div>
           </div>
           {% endfor %}
           <div id="no-filter-results" class="empty-state text-center py-5" style="display:none;">
@@ -271,6 +399,502 @@
         </div>
         <div id="job-stats" class="text-muted small mt-3" style="display:none;">
           Showing <span id="visible-count">0</span> of <span id="total-count">{{ total_jobs }}</span> jobs
+        </div>
+      </div>
+    </section>
+
+    <!-- MOCK INTERVIEW ARENA & ONLINE CODE STUDIO SECTION (WORKFLOW 2) -->
+    <section class="view" id="view-interview">
+      <div class="page-container">
+        <!-- Studio Header -->
+        <div class="studio-hero-panel mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                <span class="badge bg-danger-subtle text-danger border border-danger"><i class="bi bi-terminal me-1"></i> LIVE INTERVIEW ARENA</span>
+                <span class="badge bg-dark border border-secondary text-warning"><i class="bi bi-shield-lock me-1"></i> Staff Bar Raiser Active</span>
+                <span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-patch-check me-1"></i> liquidslr LeetCode Verified</span>
+                <span class="badge text-info border border-secondary" style="background: rgba(14, 165, 233, 0.12);"><i class="bi bi-diagram-3 me-1"></i> ByteByteGo 101</span>
+              </div>
+              <h1 class="display-6 fw-bold mb-1 text-white">Mock Interview Arena & Code Studio</h1>
+              <p class="text-muted small mb-0">Simulate FAANG & Unicorn technical rounds. Write runnable code, test it with the built-in compiler, and get instant Bar Raiser evaluations.</p>
+            </div>
+
+            <!-- Controls: Digital Countdown Timer & Surprise -->
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <!-- Live Interview Timer -->
+              <div class="timer-capsule">
+                <i class="bi bi-stopwatch text-danger fs-5"></i>
+                <span id="interview-timer">45:00</span>
+                <button type="button" id="btn-timer-toggle" class="btn btn-xs btn-outline-warning py-1 px-2" onclick="toggleInterviewTimer()" title="Start / Pause Interview Timer">
+                  <i class="bi bi-play-fill" id="timer-toggle-icon"></i> <span id="timer-toggle-text">Start</span>
+                </button>
+                <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2" onclick="resetInterviewTimer()" title="Reset to 45:00">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
+
+              <button class="btn btn-sm btn-outline-info" onclick="randomizeMockQuestion()"><i class="bi bi-shuffle me-1"></i> Surprise Question</button>
+            </div>
+          </div>
+
+          <!-- Target Picker Chips -->
+          <div class="mt-3 pt-3 border-top border-secondary">
+            <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px; font-family: 'JetBrains Mono', monospace;">Target Track Selection:</small>
+            <div class="d-flex flex-wrap gap-2" id="mock-target-chips">
+              <button type="button" class="btn btn-sm btn-outline-light active" data-target="swiggy" onclick="selectMockTarget(this)">🍕 Swiggy</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="google" onclick="selectMockTarget(this)">🔍 Google</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="amazon" onclick="selectMockTarget(this)">📦 Amazon</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="natwest" onclick="selectMockTarget(this)">🏦 NatWest</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="systemdesign" onclick="selectMockTarget(this)">📐 ByteByteGo 101</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="ai" onclick="selectMockTarget(this)">🤖 GenAI & RAG 2026/2027</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="mern" onclick="selectMockTarget(this)">⚡ Next.js 15 & React 19</button>
+              <button type="button" class="btn btn-sm btn-outline-light" data-target="startup" onclick="selectMockTarget(this)">🚀 High-Growth Startup</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Split-Screen IDE Studio Area -->
+        <div class="row g-3">
+          <!-- LEFT PANE: Full Question Specification & Architecture Blueprint -->
+          <div class="col-xl-5 col-lg-5 col-md-12">
+            <div class="panel h-100 d-flex flex-column justify-content-between" style="background: rgba(13,17,23,0.92); border: 1px solid var(--border-color);">
+              <div class="interview-left-pane" style="max-height: calc(100vh - 230px); overflow-y: auto; padding-right: 6px;">
+                <!-- Question Header -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                  <span class="badge bg-primary-subtle text-primary border border-primary" id="mock-q-badge">Target: Swiggy OA Question</span>
+                  <span class="badge bg-danger" id="mock-q-diff">Hard</span>
+                </div>
+
+                <h4 class="fw-bold text-white mb-2" id="mock-q-title">LeetCode #84 - Largest Rectangle in Histogram</h4>
+
+                <!-- LeetCode Direct Link & Pattern Tags -->
+                <div id="mock-q-meta" class="d-flex flex-wrap align-items-center gap-3 small text-muted mb-3 pb-2 border-bottom border-secondary">
+                  <a href="https://leetcode.com/problems/largest-rectangle-in-histogram/" target="_blank" rel="noopener" class="text-info text-decoration-none" id="mock-q-link">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Open on LeetCode (Free)
+                  </a>
+                  <span id="mock-q-pattern" class="text-muted"><i class="bi bi-tag me-1"></i> Pattern: Monotonic Stack</span>
+                </div>
+
+                <!-- Problem Description / Architecture Requirements -->
+                <div class="mb-3">
+                  <span class="text-uppercase text-muted fw-bold d-block mb-1" style="font-size: 11px; letter-spacing: 0.5px;">
+                    <i class="bi bi-file-earmark-text text-info me-1"></i> Problem Statement:
+                  </span>
+                  <div class="text-light small" id="mock-q-text" style="line-height: 1.65; white-space: pre-wrap;">
+                    Solve Largest Rectangle in Histogram: Given an array of integers heights representing the histogram's bar height where the width of each bar is 1, return the area of the largest rectangle in the histogram.
+                  </div>
+                </div>
+
+                <!-- Target Optimization & Complexity Box -->
+                <div id="mock-q-complexity-box" class="p-2 px-3 rounded-2 border border-secondary mb-3 small d-flex flex-wrap justify-content-between align-items-center gap-2" style="background: rgba(13,17,23,0.8);">
+                  <div>
+                    <span class="text-muted" style="font-size: 11px;"><i class="bi bi-speedometer2 text-info me-1"></i>Target Time Complexity:</span>
+                    <div class="text-info font-monospace fw-bold" id="mock-q-time-complexity">O(N) Linear Time</div>
+                  </div>
+                  <div>
+                    <span class="text-muted" style="font-size: 11px;"><i class="bi bi-memory text-warning me-1"></i>Target Space Complexity:</span>
+                    <div class="text-warning font-monospace fw-bold" id="mock-q-space-complexity">O(N) Auxiliary Space</div>
+                  </div>
+                </div>
+
+                <!-- Examples & Test Cases Section -->
+                <div id="mock-q-examples-wrapper" class="mb-3">
+                  <span class="text-uppercase text-muted fw-bold d-block mb-1" style="font-size: 11px; letter-spacing: 0.5px;">
+                    <i class="bi bi-terminal-check text-success me-1"></i> Examples & Test Cases:
+                  </span>
+                  <div id="mock-q-examples-list" class="d-flex flex-column gap-2"></div>
+                </div>
+
+                <!-- Constraints & Boundaries Section -->
+                <div id="mock-q-constraints-wrapper" class="mb-3">
+                  <span class="text-uppercase text-muted fw-bold d-block mb-1" style="font-size: 11px; letter-spacing: 0.5px;">
+                    <i class="bi bi-exclamation-octagon text-warning me-1"></i> Constraints & Boundaries:
+                  </span>
+                  <ul id="mock-q-constraints-list" class="mb-0 ps-3 small text-muted font-monospace" style="font-size: 11.5px; line-height: 1.5;"></ul>
+                </div>
+
+                <!-- Key Concepts & Hints -->
+                <div id="mock-q-hints" class="p-3 rounded-2 border border-secondary mb-3 small" style="background: rgba(22,27,34,0.7);">
+                  <strong class="text-warning d-block mb-1"><i class="bi bi-lightbulb me-1"></i>Key Concepts & Bar Raiser Checklist:</strong>
+                  <div id="mock-hints-list" class="d-flex flex-wrap gap-1 mt-1">
+                    <span class="badge bg-dark border border-secondary text-light">Monotonic Stack</span>
+                    <span class="badge bg-dark border border-secondary text-light">O(N) Linear Time</span>
+                    <span class="badge bg-dark border border-secondary text-light">Boundary Sentinel Width</span>
+                  </div>
+                </div>
+
+                <!-- Grilling Reminders -->
+                <div class="p-3 rounded-2 border border-secondary small text-muted" style="background: rgba(13,17,23,0.5);">
+                  <strong class="text-info d-block mb-1"><i class="bi bi-shield-check me-1"></i>Interview Strategy:</strong>
+                  <ul class="mb-0 ps-3 small text-muted">
+                    <li>Clarify constraints & edge cases before writing code.</li>
+                    <li>State brute-force complexity, then optimize.</li>
+                    <li>Test your code with test cases using the compiler runner.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Switch Question Footer -->
+              <div class="pt-2 mt-2 border-top border-secondary text-center">
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="generateNewMockQuestion()">
+                  <i class="bi bi-arrow-repeat me-1"></i> Fetch Another Question for this Target
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT PANE: Interactive Code Editor & Integrated Compiler Console -->
+          <div class="col-xl-7 col-lg-7 col-md-12">
+            <div class="ide-container rounded-3 border border-secondary" style="background: #0d1117; overflow: hidden; display: flex; flex-direction: column;">
+              <!-- Editor Header / Tab Bar -->
+              <div class="ide-header d-flex flex-wrap justify-content-between align-items-center p-2 px-3 border-bottom border-secondary" style="background: #161b22;">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge bg-dark border border-secondary text-info font-monospace" id="ide-filename">
+                    <i class="bi bi-file-earmark-code text-warning me-1"></i>solution.py
+                  </span>
+                  <small class="text-muted" id="mock-word-count">0 words · 0 lines</small>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                  <select id="mock-lang-select" class="form-select form-select-sm bg-dark border-secondary text-white py-0 font-monospace" style="width: 145px; font-size: 12px; height: 28px;" onchange="handleLanguageChange(this.value)">
+                    <option value="python" selected>Python 3.10</option>
+                    <option value="javascript">JavaScript (Node.js)</option>
+                  </select>
+                  <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" style="height: 28px; font-size: 11px;" onclick="resetCodeTemplate()" title="Reset Code Template">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                  </button>
+                </div>
+              </div>
+
+              <!-- Code Editor Textarea -->
+              <div class="ide-editor-wrapper" style="position: relative;">
+                <textarea id="mock-user-answer" class="ide-textarea" spellcheck="false" autocomplete="off" autocapitalize="off" rows="12" placeholder="# Write your runnable code or architecture solution here...
+def solve():
+    print('Testing solution...')
+
+solve()"></textarea>
+              </div>
+
+              <!-- Action Bar (Run & Submit) -->
+              <div class="p-2 px-3 border-top border-bottom border-secondary d-flex flex-wrap justify-content-between align-items-center gap-2" style="background: #161b22;">
+                <div class="d-flex align-items-center gap-2">
+                  <button type="button" id="btn-run-code" class="btn btn-sm btn-success px-3" onclick="runCandidateCode()">
+                    <i class="bi bi-play-fill me-1"></i> Run Code (Ctrl+Enter)
+                  </button>
+                  <button type="button" id="btn-submit-mock" class="btn btn-sm btn-primary px-3" onclick="submitMockAnswer()">
+                    <i class="bi bi-send-check me-1"></i> Submit for Bar Raiser Grading
+                  </button>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size: 11px;" onclick="clearConsole()">
+                  <i class="bi bi-trash me-1"></i> Clear Console
+                </button>
+              </div>
+
+              <!-- Integrated Compiler Terminal Output Box -->
+              <div class="compiler-console" style="background: #090d13; min-height: 140px; max-height: 240px; overflow-y: auto;">
+                <div class="d-flex justify-content-between align-items-center p-2 px-3 border-bottom border-secondary" style="background: rgba(22,27,34,0.6);">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="small font-monospace text-uppercase text-muted fw-bold" style="font-size: 11px;">
+                      <i class="bi bi-terminal me-1 text-warning"></i>Console Output
+                    </span>
+                    <span class="badge bg-secondary" id="compiler-status-badge" style="font-size: 10px;">Ready</span>
+                  </div>
+                  <small class="text-muted font-monospace" id="compiler-runtime" style="font-size: 11px;">0.0 ms</small>
+                </div>
+                <pre id="compiler-stdout" class="p-3 mb-0 font-monospace small" style="color: #58a6ff; white-space: pre-wrap; font-size: 12.5px;">$ Click 'Run Code' or press Ctrl+Enter to compile...</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Evaluation Feedback Result Box (Appears when user submits for grading) -->
+        <div id="mock-eval-result" class="panel mt-4" style="display: none;">
+          <div class="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom border-secondary">
+            <div class="d-flex align-items-center gap-3">
+              <div class="d-flex align-items-baseline gap-1">
+                <span class="display-6 fw-bold text-success" id="eval-score-num">8</span>
+                <span class="text-muted fw-bold">/ 10</span>
+              </div>
+              <span class="badge bg-success px-3 py-2 fs-6" id="eval-verdict-badge">Strong Hire</span>
+            </div>
+            <small class="text-muted"><i class="bi bi-check2-circle text-success me-1"></i> Bar Raiser Evaluation Complete</small>
+          </div>
+
+          <!-- Feedback Paragraph -->
+          <div class="p-3 rounded-3 border border-secondary mb-3" style="background: rgba(13,17,23,0.8);">
+            <h6 class="fw-bold text-white mb-1"><i class="bi bi-chat-left-dots text-info me-2"></i>Technical Depth Assessment:</h6>
+            <p class="small text-light mb-0" id="eval-tech-feedback"></p>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="p-3 rounded-3 border border-success-subtle h-100" style="background: rgba(16,185,129,0.06);">
+                <h6 class="fw-bold text-success mb-2"><i class="bi bi-check-circle me-1"></i> Key Strengths:</h6>
+                <ul class="small text-light mb-0 ps-3" id="eval-strengths-list"></ul>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="p-3 rounded-3 border border-warning-subtle h-100" style="background: rgba(245,158,11,0.06);">
+                <h6 class="fw-bold text-warning mb-2"><i class="bi bi-exclamation-triangle me-1"></i> Missing Technical Concepts:</h6>
+                <ul class="small text-light mb-0 ps-3" id="eval-missing-list"></ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- 10/10 Model Answer -->
+          <div class="p-3 rounded-3 border border-secondary" style="background: rgba(22,27,34,0.95);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="fw-bold text-warning mb-0"><i class="bi bi-star-fill text-warning me-2"></i>Staff-Level 10/10 Exemplary Answer:</h6>
+              <button class="btn btn-xs btn-outline-warning py-0 px-2" onclick="copyModelAnswer()" style="font-size: 11px;">
+                <i class="bi bi-clipboard me-1"></i> Copy
+              </button>
+            </div>
+            <div class="small text-light font-monospace" id="eval-model-answer" style="white-space: pre-wrap; line-height: 1.6;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PREP LAB & STUDY HUB SECTION -->
+    <section class="view" id="view-prep">
+      <div class="page-container">
+        <!-- Hero Header -->
+        <div class="prep-hero-panel mb-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <span class="badge bg-primary px-3 py-1 text-white"><i class="bi bi-mortarboard-fill me-1"></i> SCOUT PREP LAB</span>
+                <span class="badge bg-dark border border-secondary text-info"><i class="bi bi-lightning-charge"></i> High-Yield Interview Prep</span>
+              </div>
+              <h1 class="display-6 fw-bold mb-2 text-white">Study Hub & Company Intelligence</h1>
+              <p class="text-muted mb-0" style="max-width: 650px;">
+                Decode what top employers grill candidates on, master foundational engineering roadmaps, and walk into your interviews fully prepared.
+              </p>
+            </div>
+            <div class="d-flex gap-3">
+              <div class="p-3 rounded-3 border border-secondary" style="background: rgba(13,17,23,0.6); min-width: 130px;">
+                <div class="h3 fw-bold text-primary mb-0">5</div>
+                <small class="text-muted">Master Tracks</small>
+              </div>
+              <div class="p-3 rounded-3 border border-secondary" style="background: rgba(13,17,23,0.6); min-width: 130px;">
+                <div class="h3 fw-bold text-success mb-0">20+</div>
+                <small class="text-muted">Top Playlists</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Topic Pills -->
+          <div class="d-flex flex-wrap gap-2 mt-4 pt-3 border-top border-secondary">
+            <span class="prep-filter-pill active" onclick="filterPrepTracks('all', this)"><i class="bi bi-grid-fill"></i> All Tracks</span>
+            <span class="prep-filter-pill" onclick="filterPrepTracks('systemdesign', this)"><i class="bi bi-diagram-3"></i> System Design</span>
+            <span class="prep-filter-pill" onclick="filterPrepTracks('networking', this)"><i class="bi bi-hdd-network"></i> Networking</span>
+            <span class="prep-filter-pill" onclick="filterPrepTracks('ai', this)"><i class="bi bi-cpu"></i> Generative AI</span>
+            <span class="prep-filter-pill" onclick="filterPrepTracks('mern', this)"><i class="bi bi-layers-half"></i> Full Stack / MERN</span>
+            <span class="prep-filter-pill" onclick="filterPrepTracks('dsa', this)"><i class="bi bi-code-slash"></i> DSA Essentials</span>
+          </div>
+        </div>
+
+        <!-- Fast Jump to Dedicated Mock Interview Studio -->
+        <div class="panel mb-5 d-flex flex-wrap justify-content-between align-items-center gap-3" style="border-left: 3px solid var(--accent-rose); background: var(--bg-surface-1);">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2 bg-danger-subtle text-danger fs-3 d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+              <i class="bi bi-terminal"></i>
+            </div>
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-danger-subtle text-danger border border-danger">INTERVIEW STUDIO</span>
+                <span class="badge bg-dark border border-secondary text-info">Live Code Compiler (Python & JS)</span>
+              </div>
+              <h5 class="fw-bold text-white mb-0">Step Into the Live Mock Interview Studio</h5>
+              <p class="text-muted small mb-0">Code real FAANG/Unicorn problems, run live test cases, and get 4-dimension Bar Raiser feedback with 10/10 model answers.</p>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm px-4 py-2 fw-semibold" onclick="navigateTo('interview')">
+            <i class="bi bi-play-circle-fill me-1"></i> Open Studio Arena ➔
+          </button>
+        </div>
+
+        <!-- COMPANY INTELLIGENCE SECTION -->
+        <div class="mb-5">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+              <h3 class="mb-1 text-white"><i class="bi bi-building text-info me-2"></i>Company Interview Intelligence</h3>
+              <p class="text-muted small mb-0">Rounds breakdown, tech grilling areas, and real past interview questions from verified candidates.</p>
+            </div>
+            <div style="min-width: 280px;">
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" id="company-prep-search" class="form-control form-control-sm bg-dark border-secondary text-white" placeholder="Search any company (e.g. Swiggy, NatWest)..." oninput="searchCompanyPrep(this.value)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Featured Companies Grid (Show first 4, expand rest) -->
+          <div class="row g-3" id="featured-companies-grid">
+            {% for c in featured_companies %}
+            <div class="col-md-4 col-sm-6 company-grid-item {{ 'company-extra d-none' if loop.index > 4 else '' }}" data-name="{{ c.name|lower }}" data-company="{{ c.name }}" onclick="openCompanyPrep(this.dataset.company)">
+              <div class="company-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="d-flex align-items-center justify-content-between mb-2">
+                    <div class="company-card-avatar">{{ c.name[:1]|upper }}</div>
+                    <span class="badge {{ 'bg-danger-subtle text-danger border border-danger' if c.difficulty == 'Hard' else 'bg-warning-subtle text-warning border border-warning' }}">{{ c.difficulty }}</span>
+                  </div>
+                  <h5 class="fw-bold text-white mb-1">{{ c.name }}</h5>
+                  <p class="small text-muted mb-2">{{ c.badge }}</p>
+                </div>
+                <div class="d-flex align-items-center justify-content-between pt-2 border-top border-secondary small text-muted">
+                  <span><i class="bi bi-layers me-1"></i>{{ c.rounds_count }} Rounds</span>
+                  <span class="intel-action-badge"><i class="bi bi-arrow-right-circle"></i> View Intel</span>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          {% if featured_companies|length > 4 %}
+          <div class="text-center mt-3" id="toggle-companies-wrapper">
+            <button type="button" id="btn-toggle-companies" class="btn btn-outline-info btn-sm px-4 rounded-pill shadow-sm" onclick="toggleMoreCompanies()">
+              <i class="bi bi-chevron-down me-1" id="btn-toggle-companies-icon"></i> <span id="btn-toggle-companies-text">Show All Companies ({{ featured_companies|length - 4 }} More)</span>
+            </button>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- MASTER TECHNICAL TRACKS SECTION -->
+        <div class="mb-5">
+          <div class="mb-3">
+            <h3 class="mb-1 text-white"><i class="bi bi-book-half text-warning me-2"></i>Curated Master Tracks & Playlists</h3>
+            <p class="text-muted small mb-0">End-to-end conceptual roadmaps with verified YouTube playlists and interview-grade Q&As.</p>
+          </div>
+
+          <div class="row g-4" id="prep-tracks-container">
+            {% for track in prep_tracks.values() %}
+            <div class="col-lg-6 prep-track-item" data-track-id="{{ track.id }}">
+              <div class="prep-track-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                  <div class="d-flex align-items-start justify-content-between mb-3">
+                    <div class="track-icon-badge" style="background: {{ track.gradient }}; color: {{ track.color }}; border: 1px solid {{ track.color }}40;">
+                      <i class="bi {{ track.icon }}"></i>
+                    </div>
+                    <span class="badge bg-dark border border-secondary" style="color: {{ track.color }};">{{ track.badge }}</span>
+                  </div>
+
+                  <h4 class="fw-bold text-white mb-2">{{ track.title }}</h4>
+                  <p class="text-muted small mb-3">{{ track.description }}</p>
+
+                  <!-- Curated Playlists -->
+                  <div class="mb-3">
+                    <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">Recommended Playlists & Courses:</small>
+                    <div class="d-flex flex-column gap-2">
+                      {% for pl in track.playlists %}
+                      <a href="{{ pl.url }}" target="_blank" rel="noopener" class="playlist-chip">
+                        <i class="bi bi-youtube text-danger" style="font-size: 16px;"></i>
+                        <span class="text-white">{{ pl.title }}</span>
+                        <span class="text-muted ms-auto small">by {{ pl.creator }}</span>
+                        <span class="badge bg-dark border border-secondary text-info ms-2">{{ pl.tag }}</span>
+                      </a>
+                      {% endfor %}
+                    </div>
+                  </div>
+
+                  <!-- Roadmap -->
+                  <div class="mb-3">
+                    <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">5-Step Core Roadmap:</small>
+                    {% for step in track.roadmap %}
+                    <div class="roadmap-step text-light">{{ step }}</div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <!-- Top Questions Accordion -->
+                <div class="mt-3 pt-3 border-top border-secondary">
+                  <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">Top Interview Questions & Answers:</small>
+                  {% for q in track.top_questions %}
+                  <div class="qa-card">
+                    <div class="qa-card-header text-white" onclick="toggleQA(this)">
+                      <span><i class="bi bi-question-circle text-info me-2"></i>{{ q.q }}</span>
+                      <i class="bi bi-chevron-down text-muted transition-icon"></i>
+                    </div>
+                    <div class="qa-card-body" style="display: none;">
+                      {{ q.a }}
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- BYTEBYTEGO SYSTEM DESIGN 101 ARCHITECTURE BLUEPRINTS -->
+        <div class="mb-5" id="system-design-cases-section">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge border border-secondary text-white" style="background: rgba(124, 58, 237, 0.25);"><i class="bi bi-diagram-3 me-1"></i> ByteByteGoHq/system-design-101</span>
+                <span class="badge bg-dark border border-secondary text-info"><i class="bi bi-cpu"></i> 2026/2027 Production Scale</span>
+              </div>
+              <h3 class="mb-1 text-white">System Design 101 Architecture Blueprints</h3>
+              <p class="text-muted small mb-0">Master high-scale distributed systems case studies: Uber Geohashing, WhatsApp Persistent Gateway, Payment Idempotency, and Enterprise RAG.</p>
+            </div>
+          </div>
+
+          <div class="row g-4" id="system-design-cases-grid">
+            {% for case in system_design_cases %}
+            <div class="col-lg-6 {{ 'sysdesign-extra d-none' if loop.index > 4 else '' }}">
+              <div class="prep-track-card h-100 d-flex flex-column justify-content-between" style="border: 1px solid rgba(88, 166, 255, 0.25);">
+                <div>
+                  <div class="d-flex align-items-start justify-content-between mb-2">
+                    <span class="badge bg-primary-subtle text-primary border border-primary">{{ case.badge }}</span>
+                    <span class="badge bg-dark border border-secondary text-muted small">{{ case.category }}</span>
+                  </div>
+                  <h4 class="fw-bold text-white mb-2">{{ case.title }}</h4>
+                  <p class="text-muted small mb-3">{{ case.summary }}</p>
+
+                  <!-- Diagram Flow Concept Banner -->
+                  <div class="p-2 px-3 rounded-2 border border-secondary mb-3 small font-monospace" style="background: rgba(13,17,23,0.8); color: #58a6ff;">
+                    <i class="bi bi-diagram-2 me-2 text-warning"></i>{{ case.diagram_concept }}
+                  </div>
+
+                  <!-- Architecture Bullet Points -->
+                  <div class="mb-3">
+                    <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">Core Architectural Decisions:</small>
+                    {% for pt in case.architecture_points %}
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                      <i class="bi bi-check2-circle text-success fs-6 mt-1"></i>
+                      <span class="small text-light">{{ pt }}</span>
+                    </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
+                <!-- Interview Grilling Questions & Practice Button -->
+                <div class="mt-3 pt-3 border-top border-secondary">
+                  <small class="text-uppercase text-muted fw-bold d-block mb-2" style="font-size: 11px; letter-spacing: 0.5px;">What Bar Raisers Grill Candidates On:</small>
+                  {% for gq in case.interview_grill_questions %}
+                  <div class="p-2 px-3 rounded-2 border border-secondary mb-2 small text-light" style="background: rgba(22,27,34,0.6);">
+                    <i class="bi bi-fire text-danger me-2"></i>{{ gq }}
+                  </div>
+                  {% endfor %}
+
+                  <button class="btn btn-sm btn-outline-info w-100 mt-2" onclick="loadSystemDesignIntoMock('{{ case.id }}')">
+                    <i class="bi bi-mic me-1"></i> Practice This Case Study in AI Mock Simulator
+                  </button>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          {% if system_design_cases|length > 4 %}
+          <div class="text-center mt-3" id="toggle-sysdesign-wrapper">
+            <button type="button" id="btn-toggle-sysdesign" class="btn btn-outline-info btn-sm px-4 rounded-pill shadow-sm" onclick="toggleMoreSysDesign()">
+              <i class="bi bi-chevron-down me-1" id="btn-toggle-sysdesign-icon"></i> <span id="btn-toggle-sysdesign-text">Show All System Design Cases ({{ system_design_cases|length - 4 }} More)</span>
+            </button>
+          </div>
+          {% endif %}
         </div>
       </div>
     </section>
@@ -473,12 +1097,14 @@
     <!-- BRIEFING SECTION -->
     <section class="view" id="view-briefing">
       <div class="page-container">
-        <h1 class="mb-4">Daily Morning Briefing</h1>
-        <div class="panel">
-          <button class="btn btn-primary btn-lg" onclick="makeBriefing()"><i class="bi bi-sun"></i> Generate Executive Briefing</button>
-          <p class="muted mt-2">Synthesizes your top 5 priorities, high-match job targets, and daily habits with AI.</p>
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+          <div>
+            <h1 class="mb-1 text-white">Daily Morning Briefing</h1>
+            <p class="text-secondary small mb-0">Autonomous career intelligence, top 5 daily execution priorities, matched job targets & habit protocol.</p>
+          </div>
+          <button class="btn btn-primary px-3 py-2 rounded-pill shadow-sm" onclick="makeBriefing()"><i class="bi bi-sun-fill me-1"></i> Generate Executive Briefing</button>
         </div>
-        <div id="briefing-output" class="panel mt-3" style="display:none;white-space:pre-wrap;"></div>
+        <div id="briefing-output" class="briefing-container mt-3" style="display:none;"></div>
       </div>
     </section>
 
@@ -526,7 +1152,7 @@
         <div class="panel">
           <h5>System Diagnostics & Status</h5>
           <ul class="list-unstyled mb-0">
-            <li class="py-2 border-bottom border-secondary"><strong>Configured LLM:</strong> <span class="badge bg-primary-subtle text-primary ms-2">{{ model }}</span></li>
+            <li class="py-2 border-bottom border-secondary"><strong>Evaluation Engine:</strong> <span class="badge bg-primary-subtle text-primary ms-2">Bar Raiser Staff AI Active</span></li>
             <li class="py-2 border-bottom border-secondary"><strong>Total Jobs Tracked:</strong> <span class="badge bg-secondary ms-2">{{ total_jobs }}</span></li>
             <li class="py-2 border-bottom border-secondary"><strong>New Unreviewed Jobs:</strong> <span class="badge bg-success ms-2">{{ new_jobs }}</span></li>
             <li class="py-2 border-bottom border-secondary"><strong>Active Plugins:</strong> <span class="badge bg-info ms-2">{{ plugins|length }}</span></li>
@@ -538,6 +1164,99 @@
   </main>
 </div>
 
+<!-- Company Prep Modal (Glassmorphism & Interactive) -->
+<div class="modal fade modal-glass" id="company-prep-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content modal-content-glass text-white">
+      <div class="modal-header border-secondary pb-3">
+        <div class="d-flex align-items-center gap-3">
+          <div id="modal-company-avatar" class="company-card-avatar">C</div>
+          <div>
+            <h4 class="modal-title fw-bold text-white mb-0" id="modal-company-title">Company Name</h4>
+            <div class="d-flex align-items-center gap-2 mt-1">
+              <span class="badge bg-primary" id="modal-company-badge">Technology</span>
+              <span class="badge bg-secondary border border-secondary" id="modal-company-difficulty">Medium</span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <!-- Loading Spinner -->
+        <div id="modal-prep-loading" class="text-center py-5" style="display: none;">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="text-muted small mt-2">Loading interview intelligence...</p>
+        </div>
+
+        <div id="modal-prep-content">
+          <!-- Rounds Timeline -->
+          <div class="mb-4">
+            <h5 class="fw-bold text-white mb-3"><i class="bi bi-diagram-2 text-info me-2"></i>Hiring Rounds Breakdown</h5>
+            <div id="modal-rounds-container" class="ms-2"></div>
+          </div>
+
+          <!-- What They Grill On -->
+          <div class="mb-4">
+            <h5 class="fw-bold text-white mb-2"><i class="bi bi-fire text-danger me-2"></i>What They Grill Candidates On</h5>
+            <div class="p-3 rounded-3 border border-secondary" style="background: rgba(13,17,23,0.6);" id="modal-grill-container"></div>
+          </div>
+
+          <!-- Past Interview Questions -->
+          <div class="mb-4">
+            <h5 class="fw-bold text-white mb-2"><i class="bi bi-chat-left-quote text-warning me-2"></i>Recent Repeated Interview Questions</h5>
+            <div class="d-flex flex-column gap-2" id="modal-questions-container"></div>
+          </div>
+
+          <!-- Real LeetCode OA Problems (liquidslr dataset) -->
+          <div class="mb-4" id="modal-leetcode-section">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h5 class="fw-bold text-white mb-0"><i class="bi bi-code-square text-success me-2"></i>Real LeetCode OA Problems</h5>
+              <span class="badge bg-success-subtle text-success border border-success small"><i class="bi bi-unlock me-1"></i>Free & Open (No NeetCode Paywall)</span>
+            </div>
+            <p class="text-muted small mb-2">Verified interview problems asked by this company (sourced from liquidslr/leetcode-company-wise-problems).</p>
+            <div class="table-responsive rounded-3 border border-secondary" style="background: rgba(13,17,23,0.6);">
+              <table class="table table-dark table-hover mb-0 align-middle small">
+                <thead>
+                  <tr class="text-muted border-secondary">
+                    <th style="width: 60px;">#</th>
+                    <th>Problem Title</th>
+                    <th style="width: 100px;">Difficulty</th>
+                    <th>Pattern</th>
+                    <th style="width: 150px; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="modal-leetcode-tbody"></tbody>
+              </table>
+            </div>
+            <!-- Toggle for showing more than 4 problems in modal -->
+            <div id="modal-leetcode-toggle-wrapper" class="text-center mt-2" style="display: none;">
+              <button type="button" id="btn-toggle-modal-lc" class="btn btn-outline-info btn-sm py-1 px-3" onclick="toggleMoreModalLeetcode()">
+                <i class="bi bi-chevron-down me-1" id="modal-lc-toggle-icon"></i> <span id="modal-lc-toggle-text">Show All Problems</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Insider Pro Tip Alert -->
+          <div class="alert alert-dark border-secondary p-3 mb-0" id="modal-tip-container">
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-lightbulb-fill text-warning fs-5"></i>
+              <div>
+                <strong class="text-white">Insider Pro Tip:</strong>
+                <p class="small text-muted mb-0 mt-1" id="modal-tip-text"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-secondary">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="copyCompanyIntel()"><i class="bi bi-clipboard me-1"></i> Copy Cheatsheet</button>
+        <button type="button" class="btn btn-warning btn-sm" onclick="startMockInterviewFromModal()"><i class="bi bi-mic me-1"></i> Practice Mock Interview</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
   <div id="app-toast" class="toast" role="alert">
@@ -546,6 +1265,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/app.js?v=5.2"></script>
+<script src="/static/app.js?v=9.0"></script>
 </body>
 </html>

@@ -1,20 +1,19 @@
-# ==============================================================================
-# Git Ignore Configuration for Scout-AI
-# Ensure no sensitive keys, private resumes, or databases are committed!
-# ==============================================================================
-
-# Environment files & Secrets
+# Environment & secrets
 .env
+**/.env
+*.env
 .env.*
-.env.local
 !.env.example
+
+# Authentication credentials & certificates
+*credentials*.json
+*token*.json
 *.pem
 *.key
 *.cert
-credentials.json
-token.json
+*.pfx
 
-# Python runtime & build artifacts
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,53 +22,36 @@ dist/
 build/
 .eggs/
 *.egg
-.pytest_cache/
-.coverage
-htmlcov/
 
-# Virtual Environments
+# Virtual environments
 .venv/
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
 
-# User Data, Databases, Resumes & Drafts (Private)
+# Data & personal uploads
 data/*.db
 data/*.sqlite
 data/*.sqlite3
 data/*.csv
 data/resume.*
-data/resumes/*
-!data/resumes/.gitkeep
-data/drafts/*
-!data/drafts/.gitkeep
-app/Resume/*
-!app/Resume/.gitkeep
 uploads/*
 !uploads/.gitkeep
+data/drafts/*
+!data/drafts/.gitkeep
+app/data/
+app/Resume/*
+!app/Resume/.gitkeep
 
-# System & Application Logs
+# Logs & scratch files
 *.log
-uvicorn_*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+scratch/
+.pytest_cache/
 
-# IDE & Editor Settings
+# IDE & OS
 .vscode/
 .idea/
 *.swp
 *.swo
-*.sublime-project
-*.sublime-workspace
-
-# Operating System Files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db

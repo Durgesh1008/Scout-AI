@@ -4,7 +4,7 @@
   "description": "Personal AI Agent with job hunting, chat, and productivity features",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#0d1117",
+  "background_color": "#07090e",
+  "theme_color": "#07090e",
   "orientation": "any"
 }

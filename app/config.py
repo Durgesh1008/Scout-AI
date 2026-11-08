@@ -12,15 +12,15 @@ class Settings(BaseSettings):
     # LLM Provider Configuration ("gemini", "groq", or "ollama")
     llm_provider: str = "gemini"
 
-    # 1. Google Gemini (Free tier available via Google AI Studio)
+    # 1. Google Gemini (100% Free: 15 RPM / 1M TPM via Google AI Studio)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
-    # 2. Groq Cloud (Free tier available via console.groq.com)
+    # 2. Groq Cloud (100% Free: 30 RPM via console.groq.com)
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
 
-    # 3. Local Ollama (100% Free & Local via ollama.com)
+    # 3. Local Ollama (100% Free & Local)
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
 
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Email Automation (Gmail IMAP Drafts + SMTP)
     gmail_user: str = ""
-    gmail_app_password: str = ""  # 16-character Google App Password
+    gmail_app_password: str = ""
 
     # Notifications
     telegram_bot_token: str = ""

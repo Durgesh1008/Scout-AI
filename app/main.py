@@ -1,5 +1,6 @@
 import re
 import shutil
+from typing import Optional
 from pathlib import Path
 from datetime import date
 from fastapi import FastAPI, Request, Depends, UploadFile, File, Form, HTTPException
@@ -23,6 +24,18 @@ from app.agents.job_hunter import (
     cleanup_expired_jobs,
     calculate_job_expiry
 )
+from app.services.prep_lab import (
+    PREP_TRACKS,
+    get_company_intel,
+    list_prep_tracks,
+    list_featured_companies
+)
+from app.data.system_design_101 import list_system_design_cases
+from app.services.mock_interview import (
+    generate_mock_question,
+    evaluate_mock_answer
+)
+from app.services.code_runner import execute_code
 from app.agents.email_drafter import generate_draft, save_draft, create_gmail_draft
 from app.agents.routine_manager import list_habits, set_habit, add_task, complete_task, briefing
 from app.agents.contact_finder import find_public_contacts
@@ -72,16 +85,9 @@ def get_active_resume_profile():
     """Get profile and parsed skills for the currently active resume."""
     p = Path(settings.resume_path)
     if not p.exists():
-        # Fallback to resume in data/ or data/resumes/ if available
-        candidates = [ROOT / "data" / "resume.pdf"]
-        if RESUMES_DIR.exists():
-            candidates.extend([f for f in RESUMES_DIR.iterdir() if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}])
-        resume_folder = ROOT / "app" / "Resume"
-        if resume_folder.exists():
-            candidates.extend([f for f in resume_folder.iterdir() if f.is_file() and f.suffix.lower() in {".pdf", ".docx", ".txt"}])
-
-        for candidate in candidates:
-            if candidate.exists() and candidate.is_file():
+        # Fallback to CV-Durgesh or resume.pdf if available
+        for candidate in [ROOT / "app" / "Resume" / "CV-Durgesh.pdf", ROOT / "data" / "resume.pdf"]:
+            if candidate.exists():
                 settings.resume_path = str(candidate)
                 p = candidate
                 break
@@ -162,7 +168,10 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "plugins": list_plugins(),
             "model": settings.gemini_model if settings.llm_provider == "gemini" else settings.groq_model,
             "active_resume": active_resume,
-            "available_resumes": available_resumes
+            "available_resumes": available_resumes,
+            "prep_tracks": PREP_TRACKS,
+            "featured_companies": list_featured_companies(),
+            "system_design_cases": list_system_design_cases()
         }
     )
 
@@ -428,6 +437,78 @@ async def chat(request: Request, db: Session = Depends(get_db)):
         return {"reply": answer}
     except Exception as exc:
         raise HTTPException(400, str(exc))
+
+
+# -------------------------------------------------------------
+# PREP LAB & STUDY HUB ENDPOINTS
+# -------------------------------------------------------------
+
+@app.get("/api/prep/tracks")
+def get_tracks():
+    """List all available master technical tracks."""
+    return {"tracks": list_prep_tracks()}
+
+
+@app.get("/api/prep/track/{track_id}")
+def get_track_detail(track_id: str):
+    """Get full roadmap, playlists, and top questions for a track."""
+    track = PREP_TRACKS.get(track_id.lower())
+    if not track:
+        raise HTTPException(404, f"Prep track '{track_id}' not found")
+    return {"track": track}
+
+
+@app.get("/api/prep/companies")
+def get_companies():
+    """List featured companies with interview intelligence."""
+    return {"companies": list_featured_companies()}
+
+
+@app.get("/api/prep/company/{company_name}")
+def get_company(company_name: str):
+    """Retrieve round structure, grilling topics, and past questions for a company."""
+    return {"intel": get_company_intel(company_name)}
+
+
+# -------------------------------------------------------------
+# WORKFLOW 2: AI MOCK INTERVIEW SIMULATOR
+# -------------------------------------------------------------
+
+@app.get("/api/mock/question")
+def get_mock_question(
+    target: str = "general",
+    difficulty: str = "medium",
+    case_id: Optional[str] = None,
+    question_id: Optional[int] = None,
+):
+    """Generate or retrieve a verified technical question for a company or topic."""
+    question_data = generate_mock_question(
+        target=target, difficulty=difficulty, case_id=case_id, question_id=question_id
+    )
+    return {"question": question_data}
+
+
+@app.post("/api/mock/evaluate")
+async def evaluate_mock(request: Request):
+    """Evaluate candidate answer across 4 dimensions using Bar Raiser AI evaluator."""
+    body = await request.json()
+    question = body.get("question", "")
+    answer = body.get("answer", "")
+    target = body.get("target", "general")
+    if not answer:
+        raise HTTPException(400, "Answer cannot be empty")
+    evaluation = evaluate_mock_answer(question=question, user_answer=answer, target=target)
+    return {"evaluation": evaluation}
+
+
+@app.post("/api/mock/run_code")
+async def run_candidate_code(request: Request):
+    """Execute code snippet in real-time with Python or JavaScript compiler."""
+    body = await request.json()
+    code = body.get("code", "")
+    language = body.get("language", "python")
+    result = execute_code(code=code, language=language)
+    return {"result": result}
 
 
 # -------------------------------------------------------------

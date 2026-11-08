@@ -18,6 +18,9 @@ from app.agents.routine_manager import generate_morning_briefing
 from app.agents.orchestrator import handle_message
 from app.scheduler import run_morning_pipeline
 
+from app.services.prep_lab import PREP_TRACKS, get_company_intel
+from app.services.mock_interview import generate_mock_question, evaluate_mock_answer
+
 logger = logging.getLogger(__name__)
 
 RESUMES_DIR = ROOT / "data" / "resumes"
@@ -121,15 +124,22 @@ def handle_command(text: str, chat_id: str) -> str:
         if cmd in {"/start", "/help"}:
             return (
                 "🤖 *Welcome to Scout-AI Mobile Controller!*\n\n"
-                "You can control your agent and manage resumes right here:\n\n"
+                "You can control your agent and prepare for interviews right here:\n\n"
                 "• 📎 *Upload Resume:* Simply attach & send any PDF or DOCX file!\n"
-                "• `/resume` - View your active resume & extracted skills\n"
                 "• `/jobs` - View top matched jobs for active resume\n"
-                "• `/hunt` - Hunt 50-70+ new jobs across web sources\n"
+                "• `/hunt` - Hunt 50-70+ new jobs across LinkedIn, Wellfound & Himalayas\n"
+                "• `/resume` - View your active resume & extracted skills\n\n"
+                "📚 *Interview Preparation Hub:*\n"
+                "• `/prep` - Master tech tracks (System Design, Networking, AI, MERN, DSA)\n"
+                "• `/prep <topic>` - e.g. `/prep systemdesign` or `/prep networking`\n"
+                "• `/company <name>` - e.g. `/company swiggy` or `/company natwest`\n"
+                "• `/mock <company/topic>` - Start real AI Mock Interview (e.g. `/mock swiggy`)\n"
+                "• Reply `answer: <text>` to have Scout-AI grade your interview answer!\n\n"
+                "⚡ *Productivity & Automation:*\n"
                 "• `/run` - Run full pipeline (hunt + Gmail drafts + briefing)\n"
                 "• `/briefing` - Today's priorities & schedule\n"
                 "• `/tasks` - View today's todo list\n"
-                "• Or ask any question to chat with Scout-AI!"
+                "• Or ask any technical question to chat with Scout-AI!"
             )
 
         elif cmd == "/resume":
@@ -228,6 +238,175 @@ def handle_command(text: str, chat_id: str) -> str:
             for t in tasks:
                 lines.append(f"{'✅' if t.completed else '⬜'} {t.title}")
             return "\n\n".join(lines)
+
+        elif cmd == "/prep":
+            lines = [
+                "📚 *Scout-AI Prep Lab — Master Tech Tracks*\n",
+                "Choose any track below by sending its command:\n",
+                "• `/prep systemdesign` — 📐 System Design (HLD, LLD, Caching, DB Sharding, Kafka)",
+                "• `/prep networking` — 🌐 Computer Networking (OSI, TCP/UDP, HTTP/2, WebSockets, TLS)",
+                "• `/prep ai` — 🤖 Generative AI & LLMs (RAG, Vector DBs, LangChain, Embeddings)",
+                "• `/prep mern` — ⚡ Full Stack & MERN (React 19, Event Loop, MongoDB Indexing, Auth)",
+                "• `/prep dsa` — 🧩 DSA & SDE Sheet (Blind 75 & Striver Patterns)\n",
+                "🎯 *Looking for a specific company?*",
+                "Send `/company <name>` (e.g. `/company swiggy` or `/company natwest`)"
+            ]
+            return "\n".join(lines)
+
+        elif cmd.startswith("/prep "):
+            track_arg = cmd.replace("/prep ", "").strip().lower()
+            # Normalize common aliases
+            aliases = {
+                "system design": "systemdesign", "hld": "systemdesign", "lld": "systemdesign",
+                "network": "networking", "networks": "networking", "cn": "networking",
+                "genai": "ai", "llm": "ai", "ml": "ai",
+                "fullstack": "mern", "node": "mern", "react": "mern",
+                "leetcode": "dsa", "coding": "dsa", "algo": "dsa"
+            }
+            track_id = aliases.get(track_arg, track_arg)
+            track = PREP_TRACKS.get(track_id)
+
+            if not track:
+                return (
+                    f"⚠️ Track `{track_arg}` not found.\n\n"
+                    "Available tracks:\n"
+                    "• `/prep systemdesign`\n"
+                    "• `/prep networking`\n"
+                    "• `/prep ai`\n"
+                    "• `/prep mern`\n"
+                    "• `/prep dsa`"
+                )
+
+            lines = [
+                f"🎓 *{track['title']}* ({track['badge']})\n",
+                f"_{track['description']}_\n",
+                "📺 *Curated Playlists & Resources:*"
+            ]
+            for pl in track["playlists"]:
+                lines.append(f"• [{pl['title']} by {pl['creator']}]({pl['url']}) (`{pl['tag']}`)")
+
+            lines.append("\n🗺️ *Core Learning Roadmap:*")
+            for step in track["roadmap"]:
+                lines.append(f"{step}")
+
+            lines.append("\n💡 *Top Repeated Interview Questions:*")
+            for idx, q_item in enumerate(track["top_questions"][:3], 1):
+                lines.append(f"*{idx}. {q_item['q']}*")
+                lines.append(f"👉 _{q_item['a']}_\n")
+
+            return "\n".join(lines)
+
+        elif cmd.startswith("/company"):
+            parts = cmd.split(maxsplit=1)
+            if len(parts) < 2 or not parts[1].strip():
+                return (
+                    "🏢 *Company Interview Intelligence*\n\n"
+                    "Please specify a company name:\n"
+                    "• `/company swiggy`\n"
+                    "• `/company natwest`\n"
+                    "• `/company google`\n"
+                    "• `/company amazon`\n"
+                    "• `/company nvidia`\n"
+                    "• Or any company name to generate interview tips!"
+                )
+
+            company_name = parts[1].strip()
+            intel = get_company_intel(company_name)
+
+            lines = [
+                f"🏢 *{intel['name']}* | `{intel['badge']}`",
+                f"⚡ *Interview Difficulty:* *{intel['difficulty']}*\n",
+                "📌 *Hiring Rounds Structure:*"
+            ]
+            for r in intel["rounds"]:
+                lines.append(f"• *{r['round']} ({r['type']}):* {r['focus']}")
+
+            lines.append("\n🔥 *What They Grill Candidates On:*")
+            for g in intel["what_they_grill"]:
+                lines.append(f"• {g}")
+
+            lines.append("\n💬 *Recent Repeated Interview Questions:*")
+            for idx, q in enumerate(intel["repeated_questions"][:4], 1):
+                lines.append(f"{idx}. {q}")
+
+            if intel.get("leetcode_problems"):
+                lines.append("\n💻 *Real LeetCode OA Problems (liquidslr dataset):*")
+                for p in intel["leetcode_problems"][:4]:
+                    lines.append(f"• [{p['id']}. {p['title']}]({p['url']}) (`{p['difficulty']}` | {p['pattern']})")
+
+            if intel.get("insider_tips"):
+                lines.append(f"\n💡 *Insider Pro Tip:*\n_{intel['insider_tips']}_")
+
+            lines.append(f"\n🎯 *Want to simulate an interview?* Send `/mock {company_name}`")
+            return "\n".join(lines)
+
+        elif cmd.startswith("/mock"):
+            parts = cmd.split(maxsplit=1)
+            target = parts[1].strip() if len(parts) > 1 else "general"
+            q_data = generate_mock_question(target=target)
+
+            lines = [
+                f"🎙️ *AI Mock Interview Simulator* | `{q_data.get('context_badge', 'Technical')}`",
+                f"📌 *Topic/Problem:* *{q_data.get('title', 'System Design & Problem Solving')}*",
+                f"⚡ *Difficulty:* `{q_data.get('difficulty', 'Medium')}`\n",
+                f"❓ *Question:*\n{q_data.get('question', '')}\n"
+            ]
+
+            if q_data.get("url"):
+                lines.append(f"🔗 [Solve Directly on LeetCode]({q_data['url']})\n")
+
+            if q_data.get("key_talking_points"):
+                lines.append("💡 *Key Concepts to Cover in Your Answer:*")
+                for pt in q_data["key_talking_points"][:3]:
+                    lines.append(f"• {pt}")
+
+            lines.append("\n📝 *How to Submit Your Answer:*")
+            lines.append("Reply directly with: `answer: <your explanation here>`")
+            lines.append("Scout-AI will evaluate your technical depth, missing keywords, and score it out of 10!")
+
+            return "\n".join(lines)
+
+        elif text.strip().lower().startswith("answer:") or text.strip().lower().startswith("ans:"):
+            # Extract user answer
+            prefix_len = 7 if text.strip().lower().startswith("answer:") else 4
+            user_ans = text.strip()[prefix_len:].strip()
+            if not user_ans:
+                return "⚠️ Please provide your answer text after `answer: `."
+
+            evaluation = evaluate_mock_answer(
+                question="Candidate Mock Response",
+                user_answer=user_ans,
+                target="Technical Interview"
+            )
+
+            score = evaluation.get("score", 6)
+            verdict = evaluation.get("verdict", "Hire")
+            tech_fb = evaluation.get("technical_depth_feedback", "")
+            strengths = evaluation.get("strengths", [])
+            missing = evaluation.get("missing_concepts", [])
+            model_ans = evaluation.get("model_answer", "")
+
+            lines = [
+                f"📊 *AI Mock Interview Evaluation Report*",
+                f"🏆 *Score:* *{score}/10* | Verdict: *{verdict}*\n",
+                f"💡 *Technical Feedback:*\n_{tech_fb}_\n"
+            ]
+
+            if strengths:
+                lines.append("✅ *Key Strengths:*")
+                for s in strengths:
+                    lines.append(f"• {s}")
+
+            if missing:
+                lines.append("\n⚠️ *Missing Technical Concepts / Keywords:*")
+                for m in missing:
+                    lines.append(f"• {m}")
+
+            if model_ans:
+                lines.append(f"\n🌟 *10/10 Model Exemplary Answer:*\n_{model_ans[:600]}..._")
+
+            lines.append("\n🎯 *Next Step:* Send `/mock` to practice another question!")
+            return "\n".join(lines)
 
         else:
             return handle_message(text, db=db)
