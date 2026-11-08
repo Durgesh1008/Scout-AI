@@ -843,30 +843,43 @@ def hunt_jobs(
     db: Session,
     resume_path: Optional[str] = None,
     limit: Optional[int] = None,
-    search_query: Optional[str] = None
+    search_query: Optional[str] = None,
+    session_id: str = "default"
 ) -> dict:
     """
     Hunt for jobs prioritizing India & Remote roles for a 3-month intern / entry-level candidate.
     """
-    path = resume_path or settings.resume_path
+    from app.database import UserJobState
+
+    path = resume_path
+    if not path or not Path(path).exists():
+        for candidate in [
+            ROOT / "app" / "Resume" / "CV-Durgesh.pdf",
+            Path(settings.resume_path),
+            ROOT / "data" / "resume.pdf"
+        ]:
+            if candidate.exists():
+                path = str(candidate)
+                break
+
     max_jobs = limit or settings.daily_job_limit
     threshold = settings.match_threshold
 
     # Clean up expired jobs (>18h IST)
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
 
-    try:
-        resume_text = extract_resume_text(path)
-        profile = parse_resume_profile(resume_text)
-        resume_skills = profile["skills"]
-        exp_months = profile.get("estimated_months", 0)
-    except Exception as e:
-        return {
-            "added": 0,
-            "errors": [f"Resume parsing error: {e}"],
-            "jobs": [],
-            "skipped_no_match": 0
-        }
+    resume_skills = {"python", "javascript", "react", "node.js", "sql", "git", "fastapi", "html", "css"}
+    exp_months = 3
+
+    if path and Path(path).exists():
+        try:
+            resume_text = extract_resume_text(path)
+            profile = parse_resume_profile(resume_text)
+            if profile.get("skills"):
+                resume_skills = profile["skills"]
+            exp_months = profile.get("estimated_months", 3)
+        except Exception as e:
+            logger.warning(f"Failed to parse resume at {path}: {e}. Using standard tech profile.")
 
     cleanup_ineligible_jobs(db, exp_months)
 
@@ -899,9 +912,16 @@ def hunt_jobs(
                     skipped_no_match += 1
                     continue
 
-                # 3. Deduplication via SQLite
+                # Deduplication check
                 existing = db.query(Job).filter_by(source_id=item["source_id"]).first()
                 if existing:
+                    # Associate existing job with this session if not already associated
+                    if session_id:
+                        user_state = db.query(UserJobState).filter_by(session_id=session_id, job_id=existing.id).first()
+                        if not user_state:
+                            s = score_job(resume_skills, existing.description, existing.title, existing.location, "remote" in existing.location.lower())
+                            db.add(UserJobState(session_id=session_id, job_id=existing.id, score=s, status="New"))
+                            added_jobs.append(existing)
                     continue
 
                 # 4. Score job
@@ -938,8 +958,17 @@ def hunt_jobs(
                     contact_source=contact_source
                 )
                 db.add(job)
-                added_jobs.append(job)
+                db.flush()
 
+                if session_id:
+                    db.add(UserJobState(
+                        session_id=session_id,
+                        job_id=job.id,
+                        score=score,
+                        status="New"
+                    ))
+
+                added_jobs.append(job)
                 time.sleep(0.01)
 
             db.commit()

@@ -494,9 +494,31 @@ def task_clear_completed(request: Request, db: Session = Depends(get_db)):
 # -------------------------------------------------------------
 
 @app.post("/api/jobs/hunt")
-def hunt(db: Session = Depends(get_db), query: str = Form("")):
+def hunt(request: Request, db: Session = Depends(get_db), query: str = Form("")):
+    session_id = get_session_id(request)
+    resume_path = None
+
+    # Check for user's active resume
+    user_res = db.query(UserResume).filter_by(session_id=session_id, is_active=True).first()
+    if user_res and Path(user_res.filepath).exists():
+        resume_path = user_res.filepath
+    else:
+        for candidate in [
+            ROOT / "app" / "Resume" / "CV-Durgesh.pdf",
+            Path(settings.resume_path),
+            ROOT / "data" / "resume.pdf"
+        ]:
+            if candidate.exists():
+                resume_path = str(candidate)
+                break
+
     try:
-        result = hunt_jobs(db, search_query=query if query else None)
+        result = hunt_jobs(
+            db,
+            resume_path=resume_path,
+            search_query=query if query else None,
+            session_id=session_id
+        )
         db.add(AgentRun(agent="job_hunter", status="success", summary=f"Added {result['added']} jobs."))
         db.commit()
         return {"added": result["added"], "errors": result["errors"], "skipped": result.get("skipped_no_match", 0)}

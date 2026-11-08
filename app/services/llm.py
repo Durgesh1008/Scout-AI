@@ -22,6 +22,10 @@ def _call_gemini(
         raise LLMError("GEMINI_API_KEY is not configured.")
 
     model_name = model or settings.gemini_model or "gemini-1.5-flash"
+    # Auto-correct invalid or experimental model names
+    if "2.5" in model_name:
+        model_name = "gemini-1.5-flash"
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
 
     payload = {
@@ -41,6 +45,11 @@ def _call_gemini(
     }
 
     response = requests.post(url, json=payload, timeout=(10, 60))
+    # If 404 Not Found (invalid model name on Google endpoint), retry with standard gemini-1.5-flash
+    if response.status_code == 404 and model_name != "gemini-1.5-flash":
+        fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        response = requests.post(fallback_url, json=payload, timeout=(10, 60))
+
     if response.status_code == 429:
         raise LLMError("Gemini rate limit reached (HTTP 429).")
     response.raise_for_status()
