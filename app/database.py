@@ -1,7 +1,10 @@
 from datetime import datetime, date
+import logging
 from sqlalchemy import create_engine, String, Integer, Text, Boolean, DateTime, Date, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
-from app.config import settings
+from app.config import ROOT, settings
+
+logger = logging.getLogger("scout.database")
 
 # Normalize database URL for SQLAlchemy 2.0 (PostgreSQL / Supabase compatibility)
 raw_db_url = settings.database_url
@@ -22,11 +25,22 @@ if raw_db_url.count("@") > 1 and "://" in raw_db_url:
     except Exception:
         pass
 
+# Ensure Supabase connections enforce SSL
+if "supabase" in raw_db_url and "sslmode" not in raw_db_url:
+    delimiter = "&" if "?" in raw_db_url else "?"
+    raw_db_url = f"{raw_db_url}{delimiter}sslmode=require"
+
 if raw_db_url.startswith("sqlite"):
     engine = create_engine(raw_db_url, connect_args={"check_same_thread": False})
 else:
-    # Production PostgreSQL (Supabase pooler / Render) with connection recovery
-    engine = create_engine(raw_db_url, pool_pre_ping=True, pool_recycle=300)
+    try:
+        # Production PostgreSQL (Supabase pooler / Render) with connection recovery
+        engine = create_engine(raw_db_url, pool_pre_ping=True, pool_recycle=300)
+    except Exception as e:
+        logger.warning("Could not initialize database engine for %s: %s. Falling back to SQLite.", raw_db_url, e)
+        fallback_db = ROOT / "data" / "assistant.db"
+        fallback_db.parent.mkdir(parents=True, exist_ok=True)
+        engine = create_engine(f"sqlite:///{fallback_db.as_posix()}", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
@@ -99,15 +113,37 @@ class UserJobState(Base):
     __table_args__ = (UniqueConstraint("session_id", "job_id", name="uq_session_job"),)
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
-    # Safe auto-migration for existing SQLite schemas
-    with engine.connect() as conn:
-        for tbl in ["tasks", "habit_logs"]:
-            try:
-                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN session_id VARCHAR(64) DEFAULT 'default'"))
-                conn.commit()
-            except Exception:
-                pass
+    global engine, SessionLocal
+    try:
+        Base.metadata.create_all(bind=engine)
+        # Safe auto-migration for existing SQLite/Postgres schemas
+        with engine.connect() as conn:
+            for tbl in ["tasks", "habit_logs"]:
+                try:
+                    conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN session_id VARCHAR(64) DEFAULT 'default'"))
+                    conn.commit()
+                except Exception:
+                    pass
+    except Exception as e:
+        if not str(engine.url).startswith("sqlite"):
+            print("\n" + "=" * 80)
+            print("⚠️ [SCOUT-AI DATABASE CONNECTION WARNING]")
+            print(f"Failed to connect to configured database: {e}")
+            if "supabase.co" in str(engine.url) and "pooler.supabase.com" not in str(engine.url):
+                print("\n💡 ROOT CAUSE: You configured Supabase Direct Connection ('db.xxx.supabase.co').")
+                print("   Direct Supabase connections are IPv6-only, but Render free tier is IPv4-only.")
+                print("   SOLUTION: Use the Supabase Connection Pooler URI instead:")
+                print("   postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require")
+            print("\n>> Falling back to local SQLite database so the app can start and run on Render.")
+            print("=" * 80 + "\n", flush=True)
+
+            fallback_db = ROOT / "data" / "assistant.db"
+            fallback_db.parent.mkdir(parents=True, exist_ok=True)
+            engine = create_engine(f"sqlite:///{fallback_db.as_posix()}", connect_args={"check_same_thread": False})
+            SessionLocal.configure(bind=engine)
+            Base.metadata.create_all(bind=engine)
+        else:
+            raise e
 
 def get_db():
     db = SessionLocal()
