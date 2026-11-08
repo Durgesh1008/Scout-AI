@@ -39,7 +39,8 @@ uploads/*
 !uploads/.gitkeep
 data/drafts/*
 !data/drafts/.gitkeep
-app/data/
+data/resumes/*
+!data/resumes/.gitkeep
 app/Resume/*
 !app/Resume/.gitkeep
 
