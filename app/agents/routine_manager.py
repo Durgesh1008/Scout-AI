@@ -17,43 +17,49 @@ DEFAULT_HABITS = [
 ]
 
 
-def ensure_habits(db: Session):
-    """Ensure standard habit tracker rows exist for today."""
+def ensure_habits(db: Session, session_id: str = "default"):
+    """Ensure standard habit tracker rows exist for today for this specific user session."""
     today = date.today()
     for name in DEFAULT_HABITS:
-        if not db.query(HabitLog).filter_by(habit=name, day=today).first():
-            db.add(HabitLog(habit=name, day=today, completed=False))
+        if not db.query(HabitLog).filter_by(session_id=session_id, habit=name, day=today).first():
+            db.add(HabitLog(session_id=session_id, habit=name, day=today, completed=False))
     db.commit()
 
 
-def list_habits(db: Session) -> List[HabitLog]:
-    """Retrieve habits for today."""
-    ensure_habits(db)
-    return db.query(HabitLog).filter_by(day=date.today()).order_by(HabitLog.id).all()
+def list_habits(db: Session, session_id: str = "default") -> List[HabitLog]:
+    """Retrieve habits for today scoped to the user session."""
+    ensure_habits(db, session_id=session_id)
+    return db.query(HabitLog).filter_by(session_id=session_id, day=date.today()).order_by(HabitLog.id).all()
 
 
-def set_habit(db: Session, habit_id: int, completed: bool) -> bool:
-    """Toggle a habit status."""
-    item = db.query(HabitLog).filter_by(id=habit_id, day=date.today()).first()
+def set_habit(db: Session, habit_id: int, completed: bool, session_id: str = "default") -> bool:
+    """Toggle a habit status for the user session."""
+    item = db.query(HabitLog).filter_by(id=habit_id, session_id=session_id, day=date.today()).first()
     if not item:
-        return False
+        # Fallback by id if session_id wasn't set on legacy row
+        item = db.query(HabitLog).filter_by(id=habit_id, day=date.today()).first()
+        if not item:
+            return False
     item.completed = completed
     db.commit()
     return True
 
 
-def add_task(db: Session, title: str) -> Task:
-    """Add a new task for today."""
-    task = Task(title=title.strip(), day=date.today())
+def add_task(db: Session, title: str, session_id: str = "default") -> Task:
+    """Add a new task for today scoped to the user session."""
+    task = Task(session_id=session_id, title=title.strip(), day=date.today())
     db.add(task)
     db.commit()
     db.refresh(task)
     return task
 
 
-def complete_task(db: Session, task_id: int) -> bool:
-    """Mark a task as completed."""
-    task = db.query(Task).filter_by(id=task_id, day=date.today()).first()
+def complete_task(db: Session, task_id: int, session_id: str = "default") -> bool:
+    """Mark a task as completed for this user session."""
+    query = db.query(Task).filter_by(id=task_id, day=date.today())
+    if session_id:
+        query = query.filter_by(session_id=session_id)
+    task = query.first()
     if not task:
         return False
     task.completed = True
@@ -61,12 +67,12 @@ def complete_task(db: Session, task_id: int) -> bool:
     return True
 
 
-def get_top_5_priorities(db: Session) -> List[str]:
+def get_top_5_priorities(db: Session, session_id: str = "default") -> List[str]:
     """
-    Retrieve or synthesize the top 5 priority tasks for today.
+    Retrieve or synthesize the top 5 priority tasks for today for this user session.
     Combines user's pending tasks and system high-impact objectives.
     """
-    tasks = db.query(Task).filter_by(day=date.today(), completed=False).all()
+    tasks = db.query(Task).filter_by(session_id=session_id, day=date.today(), completed=False).all()
     priorities = [t.title for t in tasks]
 
     # Defaults if user has fewer than 5 tasks

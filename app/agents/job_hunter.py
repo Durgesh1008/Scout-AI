@@ -966,10 +966,12 @@ def hunt_jobs(
     }
 
 
-def rescore_all_jobs(db: Session, resume_path: Optional[str] = None) -> dict:
+def rescore_all_jobs(db: Session, resume_path: Optional[str] = None, session_id: str = "default") -> dict:
     """
     Recalculates match scores with India & Remote prioritized on top.
+    Persists scores into UserJobState scoped to this specific user session.
     """
+    from app.database import UserJobState
     path = resume_path or settings.resume_path
     try:
         resume_text = extract_resume_text(path)
@@ -980,14 +982,32 @@ def rescore_all_jobs(db: Session, resume_path: Optional[str] = None) -> dict:
         cleanup_ineligible_jobs(db, exp_months)
 
         jobs = db.query(Job).all()
+        existing_states = {
+            s.job_id: s for s in db.query(UserJobState).filter_by(session_id=session_id).all()
+        }
+
         for j in jobs:
-            j.score = score_job(
+            s = score_job(
                 skills,
                 j.description,
                 j.title,
                 j.location,
                 "remote" in j.location.lower()
             )
+            if j.id in existing_states:
+                existing_states[j.id].score = s
+                existing_states[j.id].updated_at = datetime.utcnow()
+            else:
+                db.add(UserJobState(
+                    session_id=session_id,
+                    job_id=j.id,
+                    score=s,
+                    status=j.status or "New"
+                ))
+
+            if session_id == "default":
+                j.score = s
+
         db.commit()
 
         export_jobs_to_csv(jobs)
@@ -997,7 +1017,8 @@ def rescore_all_jobs(db: Session, resume_path: Optional[str] = None) -> dict:
             "jobs_rescored": len(jobs),
             "skills": sorted(list(skills)),
             "experience_level": profile.get("experience_level", "Entry Level"),
-            "resume_name": Path(path).name
+            "resume_name": Path(path).name,
+            "session_id": session_id
         }
     except Exception as e:
         db.rollback()

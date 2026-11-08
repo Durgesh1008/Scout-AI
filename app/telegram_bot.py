@@ -94,7 +94,7 @@ def handle_document_upload(document: dict, chat_id: str, base_url: str, token: s
         db.commit()
 
         # Automatically re-score jobs for this user's resume without mutating global state
-        rescore_res = rescore_all_jobs(db, str(dest_path))
+        rescore_res = rescore_all_jobs(db, str(dest_path), session_id=session_id)
         skills = rescore_res.get("skills", [])
         exp = prof.get("experience_level", "Entry / Fresher")
         rescored_count = rescore_res.get("jobs_rescored", 0)
@@ -206,9 +206,18 @@ def handle_command(text: str, chat_id: str) -> str:
             return generate_morning_briefing(db)
 
         elif cmd == "/jobs":
+            session_id = f"tg_{chat_id}"
+            from app.database import UserJobState
+            user_states = {s.job_id: s for s in db.query(UserJobState).filter_by(session_id=session_id).all()}
             all_jobs = db.query(Job).all()
             if not all_jobs:
                 return "No jobs in database yet. Send `/hunt` to fetch jobs!"
+
+            # Apply user-specific scores and statuses
+            for j in all_jobs:
+                if j.id in user_states:
+                    j.score = user_states[j.id].score
+                    j.status = user_states[j.id].status
 
             # Sort with India on top, then Remote, then others
             def job_rank(j):
@@ -236,13 +245,23 @@ def handle_command(text: str, chat_id: str) -> str:
         elif cmd in {"/tasks", "/todos"}:
             from datetime import date
             from app.database import Task
-            tasks = db.query(Task).filter_by(day=date.today()).all()
+            session_id = f"tg_{chat_id}"
+            tasks = db.query(Task).filter_by(session_id=session_id, day=date.today()).all()
             if not tasks:
-                return "No tasks on your list today! Say 'Add task: [your task]' to create one."
+                return "No tasks on your list today! Say `/add [your task]` to create one."
             lines = ["📝 *Your Todo List Today:*"]
             for t in tasks:
                 lines.append(f"{'✅' if t.completed else '⬜'} {t.title}")
             return "\n\n".join(lines)
+
+        elif cmd.startswith("/add ") or cmd.startswith("add task:"):
+            from app.agents.routine_manager import add_task
+            session_id = f"tg_{chat_id}"
+            task_title = text.split(":", 1)[-1].strip() if ":" in text else text.split(" ", 1)[-1].strip()
+            if task_title:
+                t = add_task(db, task_title, session_id=session_id)
+                return f"✅ *Task Added:* `{t.title}`\nSend `/tasks` to view your list!"
+            return "⚠️ Please specify a task description, e.g. `/add Solve 2 LeetCode problems`"
 
         elif cmd == "/prep":
             lines = [

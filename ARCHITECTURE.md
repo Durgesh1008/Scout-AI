@@ -146,6 +146,36 @@ sequenceDiagram
     MockAPI-->>Studio: Render Scorecard, Detailed Feedback & Staff-Level Model Code
 ```
 
+#### 2.2.1 Multi-Tier Code Execution Sandbox & Zero-Trust Public Isolation
+
+To protect host infrastructure against unauthorized access or denial-of-service during public code evaluation, Scout-AI enforces a 6-tier defense-in-depth isolation runtime:
+
+1. **Static AST Analysis & Reflection Blocking (Pre-Execution):**
+   - Python AST visitor verifies every syntax node before compilation.
+   - Prohibits all host/OS modules: `os`, `subprocess`, `sys`, `shutil`, `socket`, `http`, `urllib`, `requests`, `ctypes`, `builtins`, `tempfile`, `pathlib`, `glob`, etc.
+   - Prohibits unsafe built-ins: `eval`, `exec`, `compile`, `open`, `__import__`, `globals`, `locals`, `getattr`, `setattr`, `delattr`.
+   - Blocks Python sandbox breakout dunders targeting introspection and prototype inheritance: `__class__`, `__subclasses__`, `__bases__`, `__mro__`, `__globals__`, `__builtins__`, `__code__`, `__closure__`, `__dict__`.
+2. **Node.js / V8 Security Engine Flags:**
+   - Regex token verification blocks `require('fs')`, `require('child_process')`, `process.exit`, `process.env`, `Function(`, etc.
+   - Executes with `--no-addons` (disabling native C++ bindings).
+   - Executes with `--disallow-code-generation-from-strings` (disabling `eval()` and `new Function()` at the V8 engine level).
+   - Caps V8 heap with `--max-old-space-size=64` (64 MB memory ceiling).
+3. **Python Isolated Mode & Network Poisoning:**
+   - Executes via `python -I -B` (Isolated Mode): ignores `PYTHONPATH` and user `site-packages`, removing the current directory from `sys.path`.
+   - Pre-injects a runtime preamble that explicitly sets `sys.modules['socket'] = None`, `sys.modules['urllib'] = None`, etc., rendering dynamic network imports inert.
+4. **POSIX Kernel-Level Resource Limits (`resource` / `RLIMIT`):**
+   - When deployed on Linux/Docker, `preexec_fn` enforces:
+     - `RLIMIT_CPU`: 3.0s hard CPU limit.
+     - `RLIMIT_AS`: 128 MB maximum virtual address space.
+     - `RLIMIT_NPROC`: 10 maximum child processes (preventing fork-bomb denial-of-service).
+     - `RLIMIT_FSIZE`: 1 MB maximum file write limit.
+     - `RLIMIT_NOFILE`: 32 maximum file descriptors.
+5. **Clean Ephemeral Filesystem:**
+   - Subprocesses run inside disposable directories (`tempfile.mkdtemp`) with immediate cleanup in `finally` blocks.
+   - Completely scrubs environment variables, removing all API tokens, database paths, and secrets.
+6. **Zero-Trust Container MicroVM Mode (`SANDBOX_MODE=docker`):**
+   - For multi-tenant public production deployments, setting `SANDBOX_MODE=docker` delegates execution to disposable, unprivileged Docker containers (`--network none`, `--memory 128m`, `--cpus 1.0`, read-only mount).
+
 ---
 
 ### 2.3 Workflow 3: Executive Morning Briefing & Routine Manager
@@ -214,9 +244,8 @@ flowchart TD
     end
 
     subgraph Storage ["Persistence"]
-        ResumesDisk[("data/resumes/ Directory")]
-        EnvConfig[("Configuration & .env Persistence")]
-        Database[("SQLite Database")]
+        ResumesDisk[("Session Vault data/resumes/tg_{chat_id}/")]
+        Database[("SQLite Multi-User Persistence (UserResume, UserJobState, Tasks, Habits)")]
     end
 
     UserMsg --> Poller
@@ -227,12 +256,12 @@ flowchart TD
     Poller --> DocHandler
 
     DocHandler -->|Download via Telegram Bot API| ResumesDisk
-    DocHandler -->|Update Active Path| EnvConfig
-    DocHandler -->|Trigger Auto Re-Score| ResumeSvc
+    DocHandler -->|Register Active UserResume (Zero .env mutation)| Database
+    DocHandler -->|Trigger Auto Re-Score (session-scoped)| ResumeSvc
 
     Router -->|/hunt, /jobs| JobSvc
     Router -->|/prep, /company, /mock| MockSvc
-    Router -->|/run, /briefing, /tasks| BriefingSvc
+    Router -->|/run, /briefing, /tasks, /add| BriefingSvc
     Router -->|answer: evaluation| MockSvc
 
     JobSvc --> Database
@@ -264,66 +293,75 @@ flowchart TD
 
 ## 3. Database Architecture & Schema Specification
 
-The persistence layer uses SQLite with SQLAlchemy ORM, mapped across 5 core entities:
+The persistence layer uses SQLite with SQLAlchemy ORM, architected for complete multi-user session isolation:
 
 ```mermaid
 erDiagram
     JOB {
         int id PK
+        string source_id UK
+        string source
         string title
         string company
         string location
-        string location_category
         string url
-        string source
         string description
+        int score "Baseline score"
+        string status "Baseline status"
+        string recruiter_name
         string recruiter_email
-        int score
-        string status
-        string roles_str
-        datetime created_at
-        datetime expires_at
+        string contact_source
+        datetime date_found
+    }
+
+    USER_RESUME {
+        int id PK
+        string session_id "Indexed by user session"
+        string filename
+        string filepath
+        text skills "Parsed JSON array"
+        string experience_level
+        boolean is_active
+        datetime uploaded_at
+    }
+
+    USER_JOB_STATE {
+        int id PK
+        string session_id "Indexed user session"
+        int job_id FK
+        int score "Personal match percentage"
+        string status "Personal status: Interested, Applied, etc."
+        datetime updated_at
     }
 
     TASK {
         int id PK
+        string session_id "Scoped to user session"
         string title
+        date day
         boolean completed
-        int priority
         datetime created_at
-        datetime completed_at
     }
 
     HABIT_LOG {
         int id PK
+        string session_id "Scoped to user session"
         string habit
+        date day
         boolean completed
-        date log_date
-        datetime updated_at
     }
 
     AGENT_RUN {
         int id PK
         string agent
         string status
-        string summary
-        text log_output
+        text summary
         datetime created_at
     }
 
-    RESUME_METADATA {
-        int id PK
-        string filename
-        string filepath
-        string experience_level
-        text raw_text
-        text extracted_skills
-        boolean is_active
-        datetime uploaded_at
-    }
-
-    RESUME_METADATA ||--o{ JOB : "matches against"
-    TASK ||--o{ AGENT_RUN : "logs updates"
+    USER_RESUME ||--o{ USER_JOB_STATE : "computes scores for"
+    JOB ||--o{ USER_JOB_STATE : "stores user status in"
+    USER_JOB_STATE }o--|| JOB : "references"
 ```
 
 ---
@@ -338,7 +376,7 @@ To guarantee safe public hosting on GitHub, Scout-AI enforces a **Zero-Leakage P
 | :--- | :--- | :---: | :--- |
 | **Secrets & Keys** | `.env` (Local filesystem) | **NO** (`.gitignore`) | `pydantic_settings.BaseSettings` |
 | **Configuration Schema** | `.env.example` | **YES** | Public template with safe placeholders |
-| **Personal Resumes** | `app/Resume/*.pdf`, `data/*.pdf` | **NO** (`.gitignore`) | `settings.resume_path` |
+| **Personal Resumes** | `data/resumes/{session_id}/`, `app/Resume/` | **NO** (`.gitignore`) | Scoped `UserResume` record & session storage |
 | **Personal Databases** | `data/*.db`, `data/*.sqlite` | **NO** (`.gitignore`) | SQLite file connection |
 | **Code Runner Sandbox** | Ephemeral `/tmp` or temp directory | **NO** | Subprocess execution with resource limits |
 

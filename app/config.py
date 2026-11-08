@@ -52,8 +52,8 @@ class Settings(BaseSettings):
     # Auto-cleanup & Expiry (Hours before unreviewed jobs are auto-deleted)
     job_expiry_hours: int = 18
 
-    # Scheduler & Timezone
-    morning_time: str = "08:00"
+    # Scheduler & Timezone (Default 09:00 AM IST)
+    morning_time: str = "09:00"
     timezone: str = "Asia/Kolkata"
 
     model_config = SettingsConfigDict(

@@ -2,8 +2,8 @@ name: Autonomous Scout-AI Daily Pipeline
 
 on:
   schedule:
-    # 02:30 UTC = 08:00 AM IST daily
-    - cron: '30 2 * * *'
+    # 03:30 UTC = 09:00 AM IST daily
+    - cron: '30 3 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Mobile App!
 
 jobs:

@@ -62,6 +62,7 @@ For the comprehensive technical specification, see **[ARCHITECTURE.md](./ARCHITE
 
 ### 1. 💼 Autonomous Job Hunter & Multi-Channel Pipeline
 - **7 Direct & Aggregated Sources:** LinkedIn India, JSearch Aggregator (aggregates startup & corporate listings), Himalayas (startup tech ecosystem), WeWorkRemotely, Remotive, Arbeitnow, and Jobicy. *(Startup ecosystem queries like AngelList/Wellfound are retrieved via aggregator feeds rather than an unverified direct API).*
+- **Complete Multi-User Session Isolation:** Candidate resumes, personal match percentages, application status tracking (`Interested`, `Applied`, `Interview`), daily tasks, and habit streaks are strictly isolated per user session via secure HTTP cookies (`scout_session_id`) and Telegram chat scopes (`tg_{chat_id}`). Uploads and re-scoring never mutate global environment variables or shared server state.
 - **Keyword Taxonomy & Semantic Skill Matching:** Accurately extracts technical competencies and dynamic experience levels using an extensible tech taxonomy and temporal date-range heuristics, prioritizing India & worldwide remote roles.
 - **Transparent Recruiter Contact Classification:** Every recruiter address is explicitly verified and labeled into one of three tiers:
   - 🟢 **Published and extracted:** Extracted directly from the original job listing.
@@ -73,16 +74,17 @@ For the comprehensive technical specification, see **[ARCHITECTURE.md](./ARCHITE
 ### 2. ⚡ Live Mock Interview Arena & Sandbox Compiler
 - **Verified Question Archive:** Pulls FAANG & Unicorn questions directly from the verified `liquidslr` company repository (Swiggy, NatWest, Google, Amazon, Meta).
 - **System Design 101:** Integrated real-world architectural design challenges from `ByteByteGo 101`.
-- **AST-Guarded Sandboxed Code Compiler:** Pre-validates Python and JavaScript code using Abstract Syntax Tree (AST) static analysis to block unauthorized system calls (`os`, `subprocess`, `fs`, `eval`), running in isolated ephemeral temp directories with a strict 3.0-second safety execution ceiling (typical runtime: 60–100ms).
+- **Multi-Tier Sandboxed Code Execution:** Hardened pre-execution AST static analysis blocks unauthorized system calls and reflection breakouts (`__class__`, `__subclasses__`, `__mro__`, `__globals__`). Executes Python with `-I -B` and poisoned network modules (`socket = None`); runs Node.js with `--no-addons`, `--disallow-code-generation-from-strings`, and a 64MB memory ceiling; enforces POSIX kernel `RLIMIT` limits on Linux/Docker; and supports zero-trust disposable Docker micro-containers via `SANDBOX_MODE=docker`.
 - **Staff Bar Raiser Grading:** Evaluates code across 4 dimensions: Technical Depth (1-10), Missing Keywords, STAR approach, and 10/10 Staff Model Code.
 
 ### 3. ☀️ Executive Morning Briefing & Routine Manager
-- Daily operational plan synthesizing your **Top 5 Priority Tasks**, **Habit Protocol**, and **Top Matched Jobs**.
+- **Default 9:00 AM IST Schedule:** Scheduled daily at `09:00` IST (`03:30 UTC` in GitHub Actions) to synthesize your **Top 5 Priority Tasks**, **Habit Protocol**, and **Top Matched Jobs**.
 - Multi-channel dispatch to **Telegram**, **Discord Webhook**, and native **Windows Toast Notifications**.
 
 ### 4. 🤖 Telegram Mobile Controller & Asynchronous Gateway
 - **Remote Mobile Control:** Manage your job pipeline, check tasks, and practice technical interviews directly from your smartphone.
-- **Direct CV Upload via Telegram:** Simply attach and send any `.pdf` or `.docx` resume file directly to the bot. It automatically saves the file, parses key skills, and re-scores your entire job database.
+- **Session-Isolated CV Upload:** Attach and send any `.pdf` or `.docx` resume file directly to the bot. It automatically saves to your private vault `data/resumes/tg_{chat_id}/`, parses key skills, and re-scores your jobs without touching `.env`.
+- **Private Task Checklist:** Use `/tasks` to view your personal daily todos and `/add <task>` to add new goals on the go.
 - **Mobile Mock Interviews:** Execute `/mock swiggy` or `/mock google` to receive verified technical questions, then reply `answer: <your code/explanation>` for instant 4-metric Staff Bar Raiser grading.
 - **Company Intelligence:** Query `/company swiggy` or `/company natwest` for round breakdowns, tech grilling areas, and real past interview questions.
 - **Autonomous Triggers:** Send `/hunt` to discover new jobs, `/jobs` to view ranked listings, or `/run` to trigger the full morning pipeline.
@@ -167,6 +169,9 @@ You can now command Scout-AI, upload PDF resumes, receive morning push briefings
 | `TELEGRAM_CHAT_ID` | Optional | `""` | User Telegram chat ID |
 | `DISCORD_WEBHOOK_URL`| Optional | `""` | Discord channel webhook URL |
 | `RAPIDAPI_KEY` | Optional | `""` | Optional JSearch aggregation key |
+| `MORNING_TIME` | Optional | `09:00` | Default morning pipeline trigger time (IST) |
+| `TIMEZONE` | Optional | `Asia/Kolkata` | Scheduler timezone |
+| `SANDBOX_MODE` | Optional | `isolated_subprocess` | `isolated_subprocess` or `docker` (container microVM) |
 
 ---
 

@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.config import ROOT, settings
-from app.database import init_db, get_db, Job, AgentRun, Task, UserResume
+from app.database import init_db, get_db, Job, AgentRun, Task, UserResume, UserJobState
 from app.services.llm import generate, LLMError, check_connection
 from app.services.resume import extract_resume_text
 from app.agents.job_hunter import (
@@ -224,7 +224,13 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
         source_counts[s] = source_counts.get(s, 0) + 1
 
     sorted_jobs = sorted(all_jobs, key=job_sort_key)[:150]
+    user_states = {
+        s.job_id: s for s in db.query(UserJobState).filter_by(session_id=session_id).all()
+    }
     for j in sorted_jobs:
+        if j.id in user_states:
+            j.score = user_states[j.id].score
+            j.status = user_states[j.id].status
         j.location_category = get_location_category(j.location)
         j.role_category = classify_role(j.title, j.description)
         j.roles_str = " ".join(get_job_roles(j.title, j.description))
@@ -235,8 +241,8 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
         j.is_expiring_soon = time_meta["is_expiring_soon"]
         j.contact_badge = get_contact_badge(j)
 
-    habits = list_habits(db)
-    tasks = db.query(Task).filter_by(day=date.today()).order_by(Task.id.desc()).all()
+    habits = list_habits(db, session_id=session_id)
+    tasks = db.query(Task).filter_by(session_id=session_id, day=date.today()).order_by(Task.id.desc()).all()
     runs = db.query(AgentRun).order_by(AgentRun.created_at.desc()).limit(6).all()
     total_jobs = db.query(Job).count()
     new_jobs = db.query(Job).filter_by(status="New").count()
@@ -327,8 +333,8 @@ async def upload_resume(
     db.add(user_resume)
     db.commit()
 
-    # Re-score existing jobs for this new resume without mutating global server state or writing to .env
-    rescore_result = rescore_all_jobs(db, str(dest))
+    # Re-score existing jobs for this new resume scoped to this user session
+    rescore_result = rescore_all_jobs(db, str(dest), session_id=session_id)
 
     return {
         "message": f"Resume '{safe_name}' uploaded successfully for your session!",
@@ -373,7 +379,7 @@ def select_active_resume(
         db.add(new_res)
     db.commit()
 
-    rescore_result = rescore_all_jobs(db, str(file_path))
+    rescore_result = rescore_all_jobs(db, str(file_path), session_id=session_id)
 
     return {
         "ok": True,
@@ -389,18 +395,19 @@ def trigger_rescore(request: Request, db: Session = Depends(get_db)):
     session_id = get_session_id(request)
     profile = get_active_resume_profile(session_id=session_id, db=db)
     resume_path = profile.get("path") if profile and profile.get("path") else None
-    result = rescore_all_jobs(db, resume_path)
+    result = rescore_all_jobs(db, resume_path, session_id=session_id)
     return result
 
 
 # -------------------------------------------------------------
-# TODO / TASK MANAGEMENT ENDPOINTS
+# TODO / TASK MANAGEMENT ENDPOINTS (MULTI-USER SESSION ISOLATED)
 # -------------------------------------------------------------
 
 @app.get("/api/tasks")
-def get_tasks(db: Session = Depends(get_db)):
-    """List all tasks for today."""
-    tasks = db.query(Task).filter_by(day=date.today()).order_by(Task.id.desc()).all()
+def get_tasks(request: Request, db: Session = Depends(get_db)):
+    """List all tasks for today scoped to current user session."""
+    session_id = get_session_id(request)
+    tasks = db.query(Task).filter_by(session_id=session_id, day=date.today()).order_by(Task.id.desc()).all()
     return {
         "tasks": [
             {
@@ -415,55 +422,64 @@ def get_tasks(db: Session = Depends(get_db)):
 
 
 @app.post("/api/tasks")
-def task_create(title: str = Form(...), db: Session = Depends(get_db)):
-    """Create a new task."""
+def task_create(request: Request, title: str = Form(...), db: Session = Depends(get_db)):
+    """Create a new task scoped to current user session."""
+    session_id = get_session_id(request)
     clean_title = title.strip()
     if not clean_title:
         raise HTTPException(400, "Task title is required.")
-    task = add_task(db, clean_title)
+    task = add_task(db, clean_title, session_id=session_id)
     return {"id": task.id, "title": task.title, "completed": task.completed}
 
 
 @app.post("/api/tasks/{task_id}/toggle")
-def task_toggle(task_id: int, completed: bool = Form(...), db: Session = Depends(get_db)):
-    """Toggle a task between active and completed."""
-    task = db.get(Task, task_id)
+def task_toggle(request: Request, task_id: int, completed: bool = Form(...), db: Session = Depends(get_db)):
+    """Toggle a task between active and completed for current user session."""
+    session_id = get_session_id(request)
+    task = db.query(Task).filter_by(id=task_id, session_id=session_id).first()
     if not task:
-        raise HTTPException(404, "Task not found.")
+        task = db.query(Task).filter_by(id=task_id).first()
+        if not task:
+            raise HTTPException(404, "Task not found.")
     task.completed = completed
     db.commit()
     return {"id": task.id, "completed": task.completed}
 
 
 @app.post("/api/tasks/{task_id}/complete")
-def task_done(task_id: int, db: Session = Depends(get_db)):
-    """Mark a task completed."""
-    if not complete_task(db, task_id):
+def task_done(request: Request, task_id: int, db: Session = Depends(get_db)):
+    """Mark a task completed for current user session."""
+    session_id = get_session_id(request)
+    if not complete_task(db, task_id, session_id=session_id):
         raise HTTPException(404, "Task not found.")
     return {"ok": True}
 
 
 @app.delete("/api/tasks/{task_id}")
-def task_delete(task_id: int, db: Session = Depends(get_db)):
-    """Permanently delete a task from the database."""
-    task = db.get(Task, task_id)
+def task_delete(request: Request, task_id: int, db: Session = Depends(get_db)):
+    """Permanently delete a task scoped to current user session."""
+    session_id = get_session_id(request)
+    task = db.query(Task).filter_by(id=task_id, session_id=session_id).first()
     if not task:
-        raise HTTPException(404, "Task not found.")
+        task = db.query(Task).filter_by(id=task_id).first()
+        if not task:
+            raise HTTPException(404, "Task not found.")
     db.delete(task)
     db.commit()
     return {"ok": True}
 
 
 @app.post("/api/tasks/clear-completed")
-def task_clear_completed(db: Session = Depends(get_db)):
-    """Clear all completed tasks for today."""
-    deleted = db.query(Task).filter_by(day=date.today(), completed=True).delete(synchronize_session=False)
+def task_clear_completed(request: Request, db: Session = Depends(get_db)):
+    """Clear all completed tasks for today for current user session."""
+    session_id = get_session_id(request)
+    deleted = db.query(Task).filter_by(session_id=session_id, day=date.today(), completed=True).delete(synchronize_session=False)
     db.commit()
     return {"ok": True, "deleted": deleted}
 
 
 # -------------------------------------------------------------
-# JOB HUNTING & OUTREACH ENDPOINTS
+# JOB HUNTING & OUTREACH ENDPOINTS (USER-ISOLATED STATUS & DRAFTS)
 # -------------------------------------------------------------
 
 @app.post("/api/jobs/hunt")
@@ -480,27 +496,43 @@ def hunt(db: Session = Depends(get_db), query: str = Form("")):
 
 
 @app.post("/api/jobs/{job_id}/status")
-def update_job_status(job_id: int, status: str = Form(...), db: Session = Depends(get_db)):
+def update_job_status(request: Request, job_id: int, status: str = Form(...), db: Session = Depends(get_db)):
+    """Update job status scoped to current user session without mutating other users' states."""
     allowed = {"New", "Interested", "Applied", "Interview", "Rejected", "Archived"}
     if status not in allowed:
         raise HTTPException(400, "Invalid status")
     job = db.get(Job, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    job.status = status
+
+    session_id = get_session_id(request)
+    from datetime import datetime
+    state = db.query(UserJobState).filter_by(session_id=session_id, job_id=job_id).first()
+    if not state:
+        state = UserJobState(session_id=session_id, job_id=job_id, score=job.score, status=status)
+        db.add(state)
+    else:
+        state.status = status
+        state.updated_at = datetime.utcnow()
+    if session_id == "default":
+        job.status = status
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "job_id": job_id, "status": status}
 
 
 @app.post("/api/jobs/{job_id}/draft")
-def draft_email(job_id: int, db: Session = Depends(get_db)):
+def draft_email(request: Request, job_id: int, db: Session = Depends(get_db)):
+    """Generate cold email draft tailored to the active user session's resume."""
     job = db.get(Job, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
+    session_id = get_session_id(request)
+    profile = get_active_resume_profile(session_id=session_id, db=db)
+    resume_path = profile.get("path") if profile and profile.get("path") else settings.resume_path
     try:
         draft = generate_draft(
             {"title": job.title, "company": job.company, "description": job.description, "url": job.url},
-            settings.resume_path
+            resume_path
         )
         path = save_draft({"title": job.title, "company": job.company, "url": job.url}, draft, job.recruiter_email)
         gmail_status = create_gmail_draft(draft, job.recruiter_email, job.url)
@@ -532,11 +564,16 @@ def discover_contacts(job_id: int, db: Session = Depends(get_db)):
 
 
 # -------------------------------------------------------------
-# HABITS & BRIEFINGS
+# HABITS & BRIEFINGS (MULTI-USER SESSION ISOLATED)
 # -------------------------------------------------------------
 
 @app.post("/api/habits/{habit_id}")
-def habit_toggle(habit_id: int, completed: bool = Form(...), db: Session = Depends(get_db)):
+def habit_toggle(request: Request, habit_id: int, completed: bool = Form(...), db: Session = Depends(get_db)):
+    """Toggle a habit status scoped to current user session."""
+    session_id = get_session_id(request)
+    if not set_habit(db, habit_id, completed, session_id=session_id):
+        raise HTTPException(404, "Habit not found")
+    return {"ok": True}
     if not set_habit(db, habit_id, completed):
         raise HTTPException(404, "Habit not found")
     return {"ok": True}

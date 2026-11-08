@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from sqlalchemy import create_engine, String, Integer, Text, Boolean, DateTime, Date, UniqueConstraint
+from sqlalchemy import create_engine, String, Integer, Text, Boolean, DateTime, Date, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from app.config import settings
 
@@ -30,14 +30,16 @@ class Job(Base):
 class HabitLog(Base):
     __tablename__ = "habit_logs"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
     habit: Mapped[str] = mapped_column(String(200))
     day: Mapped[date] = mapped_column(Date, default=date.today)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
-    __table_args__ = (UniqueConstraint("habit", "day", name="uq_habit_day"),)
+    __table_args__ = (UniqueConstraint("session_id", "habit", "day", name="uq_session_habit_day"),)
 
 class Task(Base):
     __tablename__ = "tasks"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
     title: Mapped[str] = mapped_column(String(300))
     day: Mapped[date] = mapped_column(Date, default=date.today)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -62,8 +64,27 @@ class UserResume(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
+class UserJobState(Base):
+    """Isolates individual match scores, statuses (Interested/Applied/etc.), and notes per user."""
+    __tablename__ = "user_job_states"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[str] = mapped_column(String(64), index=True, default="default")
+    job_id: Mapped[int] = mapped_column(Integer, index=True)
+    score: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(40), default="New")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("session_id", "job_id", name="uq_session_job"),)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
+    # Safe auto-migration for existing SQLite schemas
+    with engine.connect() as conn:
+        for tbl in ["tasks", "habit_logs"]:
+            try:
+                conn.execute(text(f"ALTER TABLE {tbl} ADD COLUMN session_id VARCHAR(64) DEFAULT 'default'"))
+                conn.commit()
+            except Exception:
+                pass
 
 def get_db():
     db = SessionLocal()
