@@ -6,6 +6,7 @@ from typing import Optional
 from pathlib import Path
 from datetime import date
 from fastapi import FastAPI, Request, Response, Depends, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -47,6 +48,16 @@ from app.plugins.plugin_manager import list_plugins, run_plugin
 from app.telegram_bot import run_bot
 
 app = FastAPI(title=settings.app_name)
+
+# Cross-Origin Resource Sharing (CORS) for Cloudflare Pages & frontend clients
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 templates = Jinja2Templates(directory=ROOT / "templates")
 

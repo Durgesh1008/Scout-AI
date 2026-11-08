@@ -23,3 +23,9 @@ services:
         sync: false
       - key: GMAIL_APP_PASSWORD
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: MORNING_TIME
+        value: "09:00"
+      - key: TIMEZONE
+        value: "Asia/Kolkata"

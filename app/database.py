@@ -3,8 +3,31 @@ from sqlalchemy import create_engine, String, Integer, Text, Boolean, DateTime, 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from app.config import settings
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args)
+# Normalize database URL for SQLAlchemy 2.0 (PostgreSQL / Supabase compatibility)
+raw_db_url = settings.database_url
+if raw_db_url.startswith("postgres://"):
+    raw_db_url = raw_db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif raw_db_url.startswith("postgresql://") and not raw_db_url.startswith("postgresql+"):
+    raw_db_url = raw_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+# Handle special characters like '@' in database password
+if raw_db_url.count("@") > 1 and "://" in raw_db_url:
+    try:
+        import urllib.parse
+        prefix, remainder = raw_db_url.split("://", 1)
+        auth_part, host_part = remainder.rsplit("@", 1)
+        if ":" in auth_part:
+            u_name, p_word = auth_part.split(":", 1)
+            raw_db_url = f"{prefix}://{u_name}:{urllib.parse.quote(p_word)}@{host_part}"
+    except Exception:
+        pass
+
+if raw_db_url.startswith("sqlite"):
+    engine = create_engine(raw_db_url, connect_args={"check_same_thread": False})
+else:
+    # Production PostgreSQL (Supabase pooler / Render) with connection recovery
+    engine = create_engine(raw_db_url, pool_pre_ping=True, pool_recycle=300)
+
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 class Base(DeclarativeBase):
