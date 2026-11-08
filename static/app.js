@@ -220,7 +220,13 @@ async function processResumeFile(file, statusEl = null) {
 
   try {
     const response = await fetch('/api/resume', { method: 'POST', body: formData });
-    const result = await response.json();
+    const rawText = await response.text();
+    let result;
+    try {
+      result = JSON.parse(rawText);
+    } catch (e) {
+      throw new Error(`Upload error (HTTP ${response.status}): ${rawText.slice(0, 120)}`);
+    }
     if (!response.ok) throw new Error(result.detail || 'Resume upload failed');
 
     toast(`Resume active! Re-scored ${result.jobs_rescored} jobs!`, 'success');
