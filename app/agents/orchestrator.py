@@ -49,10 +49,33 @@ def _extract_action(user_message: str) -> dict:
     return {"action": "chat"}
 
 
-def _handle_hunt_jobs(db: Session, query: str) -> str:
-    """Execute job hunt with optional search query."""
+def _handle_hunt_jobs(db: Session, query: str, session_id: str = "default") -> str:
+    """Execute job hunt with active session resume."""
+    from app.database import UserResume
+    from app.config import ROOT, settings
+    from pathlib import Path
+
+    resume_path = None
+    user_res = db.query(UserResume).filter_by(session_id=session_id, is_active=True).first()
+    if user_res and Path(user_res.filepath).exists():
+        resume_path = user_res.filepath
+    else:
+        for candidate in [
+            ROOT / "app" / "Resume" / "CV-Durgesh.pdf",
+            Path(settings.resume_path),
+            ROOT / "data" / "resume.pdf"
+        ]:
+            if candidate.exists():
+                resume_path = str(candidate)
+                break
+
     try:
-        result = hunt_jobs(db, search_query=query if query else None)
+        result = hunt_jobs(
+            db,
+            resume_path=resume_path,
+            search_query=query if query else None,
+            session_id=session_id
+        )
         parts = [f"✅ Job search completed! Added **{result['added']}** new matching jobs."]
 
         if result.get("skipped_no_match", 0) > 0:
@@ -72,7 +95,7 @@ def _handle_hunt_jobs(db: Session, query: str) -> str:
         return f"Job search failed: {str(e)}"
 
 
-def _handle_list_jobs(db: Session) -> str:
+def _handle_list_jobs(db: Session, session_id: str = "default") -> str:
     """Show saved jobs."""
     jobs = db.query(Job).order_by(Job.score.desc()).limit(8).all()
     if not jobs:
@@ -93,17 +116,17 @@ def _handle_daily_briefing(db: Session) -> str:
     return briefing(db, jobs)
 
 
-def _handle_add_task(db: Session, title: str) -> str:
+def _handle_add_task(db: Session, title: str, session_id: str = "default") -> str:
     """Fast inline task creation."""
     if not title:
         return "Please specify what task you'd like to add. Example: 'Add task: review resume'"
-    task = add_task(db, title)
+    task = add_task(db, title, session_id=session_id)
     return f"✅ Added to your Todo list: **{task.title}**"
 
 
-def _handle_list_tasks(db: Session) -> str:
+def _handle_list_tasks(db: Session, session_id: str = "default") -> str:
     """List today's tasks."""
-    tasks = db.query(Task).filter_by(day=date.today()).order_by(Task.id.desc()).all()
+    tasks = db.query(Task).filter_by(session_id=session_id, day=date.today()).order_by(Task.id.desc()).all()
     if not tasks:
         return "No tasks on your list today! Say 'Add task: [your task]' to create one."
 
@@ -115,10 +138,10 @@ def _handle_list_tasks(db: Session) -> str:
     return "\n".join(lines)
 
 
-def _handle_list_habits(db: Session) -> str:
+def _handle_list_habits(db: Session, session_id: str = "default") -> str:
     """List today's habits."""
     from app.agents.routine_manager import list_habits
-    habits = list_habits(db)
+    habits = list_habits(db, session_id=session_id)
     if not habits:
         return "No habits configured for today."
 
@@ -131,10 +154,10 @@ def _handle_list_habits(db: Session) -> str:
     return "\n".join(lines)
 
 
-def _handle_chat(db: Session, message: str) -> str:
+def _handle_chat(db: Session, message: str, session_id: str = "default") -> str:
     """Fast, single-call conversational handler."""
     today = date.today()
-    pending_tasks = db.query(Task).filter_by(day=today, completed=False).count()
+    pending_tasks = db.query(Task).filter_by(session_id=session_id, day=today, completed=False).count()
     new_jobs = db.query(Job).filter_by(status="New").count()
 
     system_prompt = (
@@ -149,26 +172,26 @@ def _handle_chat(db: Session, message: str) -> str:
         return f"I ran into an issue connecting to the AI model: {e}"
 
 
-def handle_message(message: str, db: Session) -> str:
+def handle_message(message: str, db: Session, session_id: str = "default") -> str:
     """Main routing entrypoint with zero-overhead intent dispatcher."""
     try:
         plan = _extract_action(message)
         action = plan.get("action", "chat")
 
         if action == "hunt_jobs":
-            return _handle_hunt_jobs(db, plan.get("query", ""))
+            return _handle_hunt_jobs(db, plan.get("query", ""), session_id=session_id)
         elif action == "list_jobs":
-            return _handle_list_jobs(db)
+            return _handle_list_jobs(db, session_id=session_id)
         elif action == "daily_briefing":
             return _handle_daily_briefing(db)
         elif action == "add_task":
-            return _handle_add_task(db, plan.get("title", ""))
+            return _handle_add_task(db, plan.get("title", ""), session_id=session_id)
         elif action == "list_tasks":
-            return _handle_list_tasks(db)
+            return _handle_list_tasks(db, session_id=session_id)
         elif action == "list_habits":
-            return _handle_list_habits(db)
+            return _handle_list_habits(db, session_id=session_id)
         else:
-            return _handle_chat(db, message)
+            return _handle_chat(db, message, session_id=session_id)
 
     except Exception as e:
         logger.error(f"Error handling message: {e}", exc_info=True)

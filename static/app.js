@@ -1535,14 +1535,16 @@ window.loadLeetCodeProblemIntoMock = loadLeetCodeProblemIntoMock;
 
 // Initialize on Load — RESTORE ACTIVE VIEW
 document.addEventListener('DOMContentLoaded', () => {
-  // Determine starting section from URL hash or localStorage (Default to 'jobs')
-  const hashSec = window.location.hash.replace('#', '');
+  // Determine starting section from URL path, hash, or localStorage (Default to 'jobs')
+  const pathSec = window.location.pathname.replace(/^\//, '').toLowerCase();
+  const hashSec = window.location.hash.replace('#', '').toLowerCase();
   let savedSec = null;
   try {
     savedSec = localStorage.getItem('scout_active_view');
   } catch (e) {}
 
-  const initialView = hashSec || savedSec || 'jobs';
+  const validPath = document.getElementById(`view-${pathSec}`) ? pathSec : null;
+  const initialView = hashSec || validPath || savedSec || 'jobs';
   navigateTo(initialView);
 
   updateTodoCountersFromDOM();

@@ -215,6 +215,19 @@ def startup():
 
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/jobs", response_class=HTMLResponse)
+@app.get("/chat", response_class=HTMLResponse)
+@app.get("/assistant", response_class=HTMLResponse)
+@app.get("/interview", response_class=HTMLResponse)
+@app.get("/mock", response_class=HTMLResponse)
+@app.get("/prep", response_class=HTMLResponse)
+@app.get("/resume", response_class=HTMLResponse)
+@app.get("/todos", response_class=HTMLResponse)
+@app.get("/tasks", response_class=HTMLResponse)
+@app.get("/habits", response_class=HTMLResponse)
+@app.get("/briefing", response_class=HTMLResponse)
+@app.get("/activity", response_class=HTMLResponse)
+@app.get("/settings", response_class=HTMLResponse)
 def dashboard(request: Request, response: Response, db: Session = Depends(get_db)):
     session_id = get_session_id(request)
     response.set_cookie(key="scout_session_id", value=session_id, max_age=31536000, httponly=True, samesite="lax")
@@ -627,6 +640,7 @@ def create_briefing(db: Session = Depends(get_db)):
 
 @app.post("/api/chat")
 async def chat(request: Request, db: Session = Depends(get_db)):
+    session_id = get_session_id(request)
     body = await request.json()
     message = str(body.get("message", "")).strip()
     if not message:
@@ -634,7 +648,7 @@ async def chat(request: Request, db: Session = Depends(get_db)):
     if len(message) > 6000:
         raise HTTPException(413, "Message is too long")
     try:
-        answer = handle_message(message, db=db)
+        answer = handle_message(message, db=db, session_id=session_id)
         return {"reply": answer}
     except Exception as exc:
         raise HTTPException(400, str(exc))
