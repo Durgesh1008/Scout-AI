@@ -125,10 +125,17 @@ def get_active_resume_profile(session_id: str = "default", db: Optional[Session]
                     "name": user_res.filename,
                     "path": str(p),
                     "skills": sorted(list(prof.get("skills", set()))),
-                    "experience_level": prof.get("experience_level", user_res.experience_level)
+                    "experience_level": prof.get("experience_level", user_res.experience_level),
+                    "estimated_months": prof.get("estimated_months", 0)
                 }
             except Exception:
-                return {"name": user_res.filename, "path": str(p), "skills": [], "experience_level": user_res.experience_level}
+                return {
+                    "name": user_res.filename,
+                    "path": str(p),
+                    "skills": [],
+                    "experience_level": user_res.experience_level,
+                    "estimated_months": 0
+                }
 
     # Fallback to configured resume or sample CV
     candidates = [
@@ -145,12 +152,13 @@ def get_active_resume_profile(session_id: str = "default", db: Optional[Session]
                     "name": p.name,
                     "path": str(p),
                     "skills": sorted(list(prof.get("skills", set()))),
-                    "experience_level": prof.get("experience_level", "Entry Level")
+                    "experience_level": prof.get("experience_level", "Entry Level"),
+                    "estimated_months": prof.get("estimated_months", 0)
                 }
             except Exception:
-                return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Entry Level"}
+                return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Entry Level", "estimated_months": 0}
 
-    return {"name": "No Resume", "path": "", "skills": [], "experience_level": "Upload CV"}
+    return {"name": "No Resume", "path": "", "skills": [], "experience_level": "Upload CV", "estimated_months": 0}
 
 
 def get_contact_badge(job: Job) -> Optional[dict]:
@@ -234,10 +242,14 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
     session_id = get_session_id(request)
     response.set_cookie(key="scout_session_id", value=session_id, max_age=31536000, httponly=True, samesite="lax")
 
+    active_resume = get_active_resume_profile(session_id=session_id, db=db)
+    available_resumes = get_available_resumes(session_id=session_id, db=db)
+    exp_months = active_resume.get("estimated_months", 0) if active_resume else 0
+
     # Auto-cleanup expired unreviewed jobs (>18h IST)
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
-    # Auto-cleanup senior/3+ year jobs from DB
-    cleanup_ineligible_jobs(db)
+    # Auto-cleanup ineligible jobs calibrated dynamically to candidate's resume experience
+    cleanup_ineligible_jobs(db, user_exp_months=exp_months)
 
     all_jobs = db.query(Job).all()
 
@@ -247,7 +259,7 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
         prio = 0 if cat == "india" else (1 if cat == "remote" else 2)
         return (prio, -j.score)
 
-    valid_jobs = [j for j in all_jobs if is_experience_eligible(j.title, j.description)]
+    valid_jobs = [j for j in all_jobs if is_experience_eligible(j.title, j.description, user_exp_months=exp_months)]
 
     source_counts = {}
     for j in valid_jobs:
@@ -277,9 +289,6 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
     runs = db.query(AgentRun).order_by(AgentRun.created_at.desc()).limit(6).all()
     total_jobs = len(valid_jobs)
     new_jobs = sum(1 for j in valid_jobs if getattr(j, "status", "New") == "New")
-
-    active_resume = get_active_resume_profile(session_id=session_id, db=db)
-    available_resumes = get_available_resumes(session_id=session_id, db=db)
 
     return templates.TemplateResponse(
         request,

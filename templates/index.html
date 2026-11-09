@@ -938,7 +938,7 @@ solve()"></textarea>
                   <span>Candidate Level:</span>
                   <strong class="text-primary" id="resume-display-exp">{{ active_resume.experience_level }}</strong>
                   <span class="mx-2">·</span>
-                  <span>Filtered for: <strong class="text-light">0-2 Yrs / Internship & Junior Tech Roles</strong></span>
+                  <span>Filtered for: <strong class="text-light" id="resume-display-tier">{% if active_resume.estimated_months and active_resume.estimated_months >= 24 %}{{ active_resume.experience_level }} Roles{% else %}0-2 Yrs / Internship & Junior Tech Roles{% endif %}</strong></span>
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
                   <button class="btn btn-sm btn-outline-info" onclick="rescoreJobs()">

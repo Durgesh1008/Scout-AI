@@ -337,82 +337,96 @@ def is_location_eligible(location: str, remote: bool = False, allow_out_of_india
     return allow_out_of_india
 
 
-def is_experience_eligible(title: str, desc: str, user_exp_months: int = 3) -> bool:
+def is_experience_eligible(title: str, desc: str, user_exp_months: int = 0) -> bool:
     """
-    Candidate has ~0-2 years experience (intern / fresher / entry level).
-    Strictly filters out:
-    1. Non-tech roles
-    2. Senior / Lead / Principal / Architect / Management roles in title and description
-    3. Any job demanding 3+, 4+, 5+, 6+ or higher years of experience
-    4. Mid-senior year ranges (e.g. 2-5 yrs, 3-5 yrs, 4-6 yrs, 5-8 yrs)
-    5. Minimum experience requirements >= 3 years
-    6. Non-software or academic roles
+    Dynamically filters tech jobs based on candidate's parsed resume experience:
+    - If resume has no experience or <= 2 years:
+      Strictly filters for 0-2 years (intern, fresher, junior). Reject all 3+, 4+, 5+, etc.
+      and all senior/lead/architect roles.
+    - If resume has 2+ years of experience (e.g. 3, 4, 5+ years):
+      Dynamically unlocks matching mid-level and senior opportunities calibrated to their
+      actual career level (up to candidate_years + 1.5).
     """
     title_low = (title or "").lower().strip()
     desc_low = (desc or "").lower().strip()
     combo = f"{title_low} {desc_low}"
+
+    candidate_years = round((user_exp_months or 0) / 12.0, 1)
 
     # 1. Reject non-tech roles
     for non_tech in NON_TECH_ROLE_EXCLUSIONS:
         if re.search(rf"\b{re.escape(non_tech.strip())}\b", title_low):
             return False
 
-    # 2. Reject senior/lead/management roles in title
-    for senior_word in SENIOR_ROLE_EXCLUSIONS:
-        if re.search(rf"\b{re.escape(senior_word.strip())}\b", title_low):
+    # 2. Extract job required experience range and minimum
+    low_yr, high_yr = None, None
+    m_range = re.search(r"\b([0-9]|1\d)\s*(?:-|–|to)\s*([0-9]|1\d)\s*(?:years?|yrs?|yr)\b", combo)
+    if m_range:
+        low_yr = int(m_range.group(1))
+        high_yr = int(m_range.group(2))
+
+    min_yr = None
+    if low_yr is not None:
+        min_yr = low_yr
+    else:
+        for pat in [
+            r"\b([1-9]|1\d)\s*\+\s*(?:years?|yrs?|yr)\b",
+            r"\b(?:minimum|min\.?|at least)\s+(?:of\s+)?([1-9]|1\d)\+?\s*(?:years?|yrs?|yr)\b",
+            r"\b(?:experience|exp)\s*(?:required|needed|level)?\s*[:=-]\s*([0-9]|1\d)",
+            r"\b(?:must have|requires?|seeking|needs?)\s+(?:at least\s+|a minimum of\s+)?([1-9]|1\d)\+?\s*(?:years?|yrs?|yr)\b",
+            r"\b([1-9]|1\d)\+?\s*(?:years?|yrs?|yr)\b(?:\s+(?:of\s+)?(?:relevant|professional|hands[- ]on|industry|software|development|work|prior|practical))?\s+experience\b",
+            r"\b([1-9]|1\d)\+?\s*(?:years?|yrs?|yr)\b\s+(?:in|with|working|building|developing|designing|architecting)\b",
+            r"\(\s*([1-9]|1\d)\+?\s*(?:-|–|to)?\s*\d*\s*(?:years?|yrs?|yr)\s*\)"
+        ]:
+            m = re.search(pat, combo if pat != r"\(\s*([1-9]|1\d)\+?\s*(?:-|–|to)?\s*\d*\s*(?:years?|yrs?|yr)\s*\)" else title_low)
+            if m:
+                min_yr = int(m.group(1))
+                break
+
+    # 3. Check role seniority
+    is_senior_title = bool(re.search(r"\b(?:sr\.?|senior)\b", title_low))
+    is_leadership = bool(re.search(r"\b(?:lead|principal|staff|architect|director|vp|vice\s+president|head\s+of|manager|chief|partner\s+engineer)\b", title_low))
+
+    # CASE A: Candidate has 0 - 2 years experience (or no experience in resume)
+    if candidate_years <= 2.0:
+        # Strictly reject senior or leadership titles
+        if is_senior_title or is_leadership:
+            return False
+        # Reject explicit senior declaration in description
+        if re.search(r"\b(?:looking for|seeking|hiring|we need)\s+(?:an?\s+)?(?:senior|lead|principal|staff|architect)\b", desc_low):
+            return False
+        if re.search(r"\b(?:role|position|job title|level)\s*[:=-]\s*(?:senior|lead|principal|staff|architect)\b", desc_low):
             return False
 
-    if re.search(r"\b(?:sr\.?|senior|lead|principal|staff|architect|director|vp|vice\s+president|head\s+of|manager|chief|partner\s+engineer)\b", title_low):
-        return False
+        # Reject academic / postdoc / foreign language markers in title
+        for academic in FOREIGN_LANGUAGE_OR_ACADEMIC_EXCLUSIONS:
+            if academic.strip() in title_low:
+                return False
 
-    # 3. Reject academic / postdoc / foreign language markers in title
-    for academic in FOREIGN_LANGUAGE_OR_ACADEMIC_EXCLUSIONS:
-        if academic.strip() in title_low:
+        # Reject if job asks for >= 3 years min, or 2-5+ years range
+        if low_yr is not None and high_yr is not None:
+            if low_yr >= 3 or (low_yr >= 2 and high_yr >= 4):
+                return False
+        elif min_yr is not None and min_yr >= 3:
             return False
 
-    # 4. Reject postings explicitly hiring senior/lead roles in description
-    if re.search(r"\b(?:looking for|seeking|hiring|we need)\s+(?:an?\s+)?(?:senior|lead|principal|staff|architect)\b", desc_low):
-        return False
-    if re.search(r"\b(?:role|position|job title|level)\s*[:=-]\s*(?:senior|lead|principal|staff|architect)\b", desc_low):
-        return False
-
-    # 5. Reject year ranges requiring 3+ or higher minimum, or 2 to 4+ years (e.g. 2-5 yrs, 3-5 yrs, 4-6 yrs, 5-8 yrs)
-    range_match = re.search(r"\b([0-9]|1\d)\s*(?:-|–|to)\s*([0-9]|1\d)\s*(?:years?|yrs?|yr)\b", combo)
-    if range_match:
-        low = int(range_match.group(1))
-        high = int(range_match.group(2))
-        if low >= 3 or (low >= 2 and high >= 4):
+    # CASE B: Candidate has 2+ years experience (e.g. 3, 4, 5+ years)
+    else:
+        max_allowed = max(candidate_years + 1.5, 3.0)
+        # If job demands more experience than candidate has + 1.5 years
+        if min_yr is not None and min_yr > max_allowed:
+            return False
+        if low_yr is not None and low_yr > max_allowed:
             return False
 
-    # 6. Reject explicit 3+, 4+, 5+, 6+, etc. plus years (e.g. "3+ years", "4+ yrs", "5+ years", "6+ yr")
-    if re.search(r"\b([3-9]|1\d|20)\s*\+\s*(?:years?|yrs?|yr)\b", combo):
-        return False
+        # Only allow leadership roles if candidate has at least 5 years
+        if is_leadership and candidate_years < 5.0:
+            return False
+        # Only allow senior titles if candidate has at least 3.0 years
+        if is_senior_title and candidate_years < 3.0:
+            return False
 
-    # 7. Reject minimum 3+ years / at least 3 years (e.g. "minimum 3 years", "min 5 yrs", "at least 3 years")
-    if re.search(r"\b(?:minimum|min\.?|at least)\s+(?:of\s+)?([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b", combo):
-        return False
-
-    # 8. Reject experience labels demanding 3+ years (e.g. "Experience: 5+ years", "Exp: 3-5 yrs", "Experience required: 4 years")
-    if re.search(r"\b(?:experience|exp)\s*(?:required|needed|level)?\s*[:=-]\s*([3-9]|1\d|20)", combo):
-        return False
-
-    # 9. Reject requirement phrasing with 3+ years (e.g. "requires 3+ years", "must have 5 years", "seeking 4 years")
-    if re.search(r"\b(?:must have|requires?|seeking|needs?)\s+(?:at least\s+|a minimum of\s+)?([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b", combo):
-        return False
-
-    # 10. Reject intermediate word experience patterns (e.g. "5 years of professional experience", "3+ years hands-on experience")
-    if re.search(r"\b([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b(?:\s+(?:of\s+)?(?:relevant|professional|hands[- ]on|industry|software|development|work|prior|practical))?\s+experience\b", combo):
-        return False
-
-    # 11. Reject tech experience phrases (e.g. "5+ years in React", "3 years with Node", "4 years building APIs")
-    if re.search(r"\b([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b\s+(?:in|with|working|building|developing|designing|architecting)\b", combo):
-        return False
-
-    # 12. Reject parenthetical year specification in title (e.g. "( 2 - 5 Years)", "(3+ years)", "(5 years)")
-    if re.search(r"\(\s*([2-9]|1\d)\+?\s*(?:-|–|to)?\s*\d*\s*(?:years?|yrs?|yr)\s*\)", title_low):
-        return False
-
-    # 13. Must be a software/engineering/developer role (word bounded)
+    # 4. Tech role pattern check
     tech_patterns = [
         r"\bdeveloper\b", r"\bsoftware\b", r"\bengineer\b", r"\bfull\s*stack\b",
         r"\bbackend\b", r"\bfrontend\b", r"\bmern\b", r"\breact\b", r"\bnode\b",
@@ -420,10 +434,7 @@ def is_experience_eligible(title: str, desc: str, user_exp_months: int = 3) -> b
         r"\bassociate\b", r"\bsde\b", r"\bweb\b", r"\bai\b", r"\bcloud\b",
         r"\bprogrammer\b", r"\bprogramming\b"
     ]
-    if not any(re.search(p, title_low) for p in tech_patterns):
-        return False
-
-    return True
+    return any(re.search(p, title_low) for p in tech_patterns)
 
 
 def parse_resume_profile(resume_text: str) -> Dict[str, Any]:
@@ -434,17 +445,23 @@ def parse_resume_profile(resume_text: str) -> Dict[str, Any]:
     lower = resume_text.lower()
     extracted_skills = {skill for skill in TECH_TAXONOMY if re.search(rf"\b{re.escape(skill)}\b", lower)}
 
-    # 1. Look for explicit experience mentions (e.g. "2 years experience", "6 months internship")
+    # 1. Look for explicit experience mentions
     month_match = re.search(r"(\d+)\s*(?:month|months)\s*(?:of)?\s*(?:internship|experience)", lower)
-    year_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:year|years)\s*(?:of)?\s*(?:experience)", lower)
+    exp_prefix_match = re.search(r"(?:total\s+)?(?:experience|exp)\s*[:=-]?\s*(\d+(?:\.\d+)?)\+?\s*(?:years?|yrs?)", lower)
+    exp_phrase_match = re.search(r"(\d+(?:\.\d+)?)\s*\+?\s*(?:year|years|yrs)\s*(?:of)?\s*(?:relevant\s+|professional\s+|software\s+|hands[- ]on\s+)?(?:experience|exp)", lower)
+    exp_context_match = re.search(r"(\d+(?:\.\d+)?)\s*\+?\s*(?:year|years|yrs)\s+(?:in|as a|working with)\b", lower)
 
     estimated_months = 0
-    if month_match:
+    if exp_prefix_match:
+        estimated_months = int(float(exp_prefix_match.group(1)) * 12)
+    elif exp_phrase_match:
+        estimated_months = int(float(exp_phrase_match.group(1)) * 12)
+    elif exp_context_match:
+        estimated_months = int(float(exp_context_match.group(1)) * 12)
+    elif month_match:
         estimated_months = int(month_match.group(1))
-    elif year_match:
-        estimated_months = int(float(year_match.group(1)) * 12)
 
-    # 2. Date ranges heuristic: e.g., "2022 - 2024", "2023 - present"
+    # 2. Date ranges heuristic: e.g., "2021 - 2024", "2022 - present"
     current_year = datetime.now().year
     date_ranges = re.findall(r"\b(201\d|202\d)\s*(?:-|–|to)\s*(201\d|202\d|present|current)\b", lower)
     if date_ranges and estimated_months == 0:
@@ -452,9 +469,11 @@ def parse_resume_profile(resume_text: str) -> Dict[str, Any]:
         for start_y, end_y in date_ranges:
             start_val = int(start_y)
             end_val = current_year if end_y in ["present", "current"] else int(end_y)
-            diff = max(0, min(end_val - start_val, 10))
+            diff = max(0, min(end_val - start_val, 15))
             total_range_years = max(total_range_years, diff)
-        estimated_months = max(estimated_months, total_range_years * 12)
+        is_student = bool(re.search(r"\b(student|b\.?tech|undergraduate|bachelor|pursuing)\b", lower))
+        if not is_student and total_range_years >= 2:
+            estimated_months = max(estimated_months, total_range_years * 12)
 
     # 3. Determine calibrated experience level
     is_intern = bool(re.search(r"\b(intern|internship|trainee|apprentice|student|b\.?tech|undergraduate)\b", lower))
@@ -897,6 +916,45 @@ def cleanup_ineligible_jobs(db: Session, user_exp_months: int = 3) -> int:
     return removed
 
 
+def get_calibrated_linkedin_queries(exp_months: int = 0) -> List[tuple]:
+    """
+    Returns search queries calibrated to candidate's parsed resume experience.
+    If no experience / <= 2 yrs, focuses on 0-2 yr / intern / junior roles.
+    If 2+ years, unlocks mid-level and senior roles.
+    """
+    years = (exp_months or 0) / 12.0
+    if years >= 4.0:
+        return [
+            ("Senior Full Stack Developer", "India"),
+            ("Senior Software Engineer", "India"),
+            ("Senior Frontend Developer", "India"),
+            ("Senior Backend Developer", "India"),
+            ("Tech Lead", "India"),
+            ("MERN Stack Developer", "India")
+        ]
+    elif years >= 2.0:
+        return [
+            ("Full Stack Developer", "India"),
+            ("Software Engineer", "India"),
+            ("Frontend Developer", "India"),
+            ("Backend Developer", "India"),
+            ("Node.js Developer", "India"),
+            ("React Developer", "India"),
+            ("MERN Stack Developer", "India")
+        ]
+    else:
+        return [
+            ("Software Engineer Intern", "India"),
+            ("Full Stack Developer Intern", "India"),
+            ("Frontend Developer Intern", "India"),
+            ("Backend Developer Intern", "India"),
+            ("MERN Stack Developer", "India"),
+            ("React Developer Intern", "India"),
+            ("Junior Software Engineer", "India"),
+            ("Software Engineer", "India")
+        ]
+
+
 def hunt_jobs(
     db: Session,
     resume_path: Optional[str] = None,
@@ -905,7 +963,7 @@ def hunt_jobs(
     session_id: str = "default"
 ) -> dict:
     """
-    Hunt for jobs prioritizing India & Remote roles for a 3-month intern / entry-level candidate.
+    Hunt for jobs prioritizing India & Remote roles calibrated to candidate's resume experience.
     """
     from app.database import UserJobState
 
@@ -927,7 +985,7 @@ def hunt_jobs(
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
 
     resume_skills = {"python", "javascript", "react", "node.js", "sql", "git", "fastapi", "html", "css"}
-    exp_months = 3
+    exp_months = 0
 
     if path and Path(path).exists():
         try:
@@ -935,7 +993,7 @@ def hunt_jobs(
             profile = parse_resume_profile(resume_text)
             if profile.get("skills"):
                 resume_skills = profile["skills"]
-            exp_months = profile.get("estimated_months", 3)
+            exp_months = profile.get("estimated_months", 0)
         except Exception as e:
             logger.warning(f"Failed to parse resume at {path}: {e}. Using standard tech profile.")
 
@@ -944,13 +1002,17 @@ def hunt_jobs(
     added_jobs = []
     errors = []
     skipped_no_match = 0
+    calibrated_queries = get_calibrated_linkedin_queries(exp_months)
 
     for source_name, config in SOURCES.items():
         if len(added_jobs) >= max_jobs:
             break
 
         try:
-            raw_listings = _fetch_source(source_name, config)
+            if source_name == "linkedin":
+                raw_listings = fetch_linkedin_jobs(calibrated_queries)
+            else:
+                raw_listings = _fetch_source(source_name, config)
 
             for raw in raw_listings:
                 if len(added_jobs) >= max_jobs:
