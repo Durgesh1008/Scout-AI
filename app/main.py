@@ -114,33 +114,48 @@ def get_available_resumes(session_id: str = "default", db: Optional[Session] = N
 
 def get_active_resume_profile(session_id: str = "default", db: Optional[Session] = None):
     """Get active resume profile scoped to this user session without mutating global state."""
+    import json
     if db:
         user_res = db.query(UserResume).filter_by(session_id=session_id, is_active=True).first()
-        if user_res and Path(user_res.filepath).exists():
+        if user_res:
             p = Path(user_res.filepath)
-            try:
-                text = extract_resume_text(str(p))
-                prof = parse_resume_profile(text)
-                return {
-                    "name": user_res.filename,
-                    "path": str(p),
-                    "skills": sorted(list(prof.get("skills", set()))),
-                    "experience_level": prof.get("experience_level", user_res.experience_level),
-                    "estimated_months": prof.get("estimated_months", 0)
-                }
-            except Exception:
-                return {
-                    "name": user_res.filename,
-                    "path": str(p),
-                    "skills": [],
-                    "experience_level": user_res.experience_level,
-                    "estimated_months": 0
-                }
+            if p.exists():
+                try:
+                    text = extract_resume_text(str(p))
+                    prof = parse_resume_profile(text)
+                    return {
+                        "name": user_res.filename,
+                        "path": str(p),
+                        "skills": sorted(list(prof.get("skills", set()))),
+                        "experience_level": prof.get("experience_level", user_res.experience_level),
+                        "estimated_months": prof.get("estimated_months", 0)
+                    }
+                except Exception:
+                    pass
+
+            # Persistent fallback from database record (survives ephemeral container restarts)
+            saved_skills = []
+            if user_res.skills:
+                try:
+                    saved_skills = json.loads(user_res.skills)
+                except Exception:
+                    pass
+
+            fallback_path = ROOT / "app" / "Resume" / "CV-Durgesh.pdf"
+            active_path = str(fallback_path) if fallback_path.exists() else (str(p) if p.exists() else "")
+
+            return {
+                "name": user_res.filename,
+                "path": active_path,
+                "skills": saved_skills or ["python", "javascript", "react", "node.js", "sql", "git"],
+                "experience_level": user_res.experience_level or "Entry Level (0-2 Years)",
+                "estimated_months": 0
+            }
 
     # Fallback to configured resume or sample CV
     candidates = [
-        Path(settings.resume_path),
         ROOT / "app" / "Resume" / "CV-Durgesh.pdf",
+        Path(settings.resume_path),
         ROOT / "data" / "resume.pdf"
     ]
     for p in candidates:
@@ -152,11 +167,11 @@ def get_active_resume_profile(session_id: str = "default", db: Optional[Session]
                     "name": p.name,
                     "path": str(p),
                     "skills": sorted(list(prof.get("skills", set()))),
-                    "experience_level": prof.get("experience_level", "Entry Level"),
+                    "experience_level": prof.get("experience_level", "Entry Level (0-2 Years)"),
                     "estimated_months": prof.get("estimated_months", 0)
                 }
             except Exception:
-                return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Entry Level", "estimated_months": 0}
+                return {"name": p.name, "path": str(p), "skills": [], "experience_level": "Entry Level (0-2 Years)", "estimated_months": 0}
 
     return {"name": "No Resume", "path": "", "skills": [], "experience_level": "Upload CV", "estimated_months": 0}
 

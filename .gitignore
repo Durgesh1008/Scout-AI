@@ -43,6 +43,7 @@ data/resumes/*
 !data/resumes/.gitkeep
 app/Resume/*
 !app/Resume/.gitkeep
+!app/Resume/CV-Durgesh.pdf
 
 # Logs & scratch files
 *.log
