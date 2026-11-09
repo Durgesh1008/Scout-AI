@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # 1. Google Gemini (100% Free: 15 RPM / 1M TPM via Google AI Studio)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     # 2. Groq Cloud (100% Free: 30 RPM via console.groq.com)
     groq_api_key: str = ""

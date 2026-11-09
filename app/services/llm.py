@@ -21,10 +21,10 @@ def _call_gemini(
     if not api_key:
         raise LLMError("GEMINI_API_KEY is not configured.")
 
-    model_name = model or settings.gemini_model or "gemini-1.5-flash"
-    # Auto-correct invalid or experimental model names
-    if "2.5" in model_name:
-        model_name = "gemini-1.5-flash"
+    model_name = model or settings.gemini_model or "gemini-3.5-flash-lite"
+    # Auto-upgrade deprecated or retired model names
+    if any(deprecated in model_name for deprecated in ["1.5", "2.0", "2.5"]):
+        model_name = "gemini-3.5-flash-lite"
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
 
@@ -45,9 +45,9 @@ def _call_gemini(
     }
 
     response = requests.post(url, json=payload, timeout=(10, 60))
-    # If 404 Not Found (invalid model name on Google endpoint), retry with standard gemini-1.5-flash
-    if response.status_code == 404 and model_name != "gemini-1.5-flash":
-        fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # If 404 Not Found (deprecated model), auto-retry with supported gemini-3.5-flash-lite
+    if response.status_code == 404 and model_name != "gemini-3.5-flash-lite":
+        fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={api_key}"
         response = requests.post(fallback_url, json=payload, timeout=(10, 60))
 
     if response.status_code == 429:

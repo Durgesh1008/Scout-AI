@@ -748,8 +748,8 @@ async def plugin_run(name: str, request: Request):
 def health_check():
     connected = check_connection()
     model = settings.gemini_model if settings.llm_provider == "gemini" else settings.groq_model
-    if "2.5" in model:
-        model = "gemini-1.5-flash"
+    if any(deprecated in model for deprecated in ["1.5", "2.0", "2.5"]):
+        model = "gemini-3.5-flash-lite"
     return {
         "connected": connected,
         "model": model
