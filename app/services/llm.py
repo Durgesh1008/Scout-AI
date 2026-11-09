@@ -96,6 +96,9 @@ def _call_groq(
     }
 
     response = requests.post(url, headers=headers, json=payload, timeout=(10, 60))
+    if response.status_code == 404 and model_name != "llama-3.3-70b-versatile":
+        payload["model"] = "llama-3.3-70b-versatile"
+        response = requests.post(url, headers=headers, json=payload, timeout=(10, 60))
     if response.status_code == 429:
         raise LLMError("Groq rate limit reached (HTTP 429).")
     response.raise_for_status()

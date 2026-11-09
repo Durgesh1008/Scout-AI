@@ -25,6 +25,8 @@ from app.agents.job_hunter import (
     get_job_roles,
     ROLE_LABELS,
     cleanup_expired_jobs,
+    cleanup_ineligible_jobs,
+    is_experience_eligible,
     calculate_job_expiry
 )
 from app.services.prep_lab import (
@@ -234,6 +236,9 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
 
     # Auto-cleanup expired unreviewed jobs (>18h IST)
     cleanup_expired_jobs(db, max_age_hours=settings.job_expiry_hours)
+    # Auto-cleanup senior/3+ year jobs from DB
+    cleanup_ineligible_jobs(db)
+
     all_jobs = db.query(Job).all()
 
     # Prioritize India (0) & Global Remote (1) over foreign-only locations (2), then sort by score descending
@@ -242,12 +247,14 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
         prio = 0 if cat == "india" else (1 if cat == "remote" else 2)
         return (prio, -j.score)
 
+    valid_jobs = [j for j in all_jobs if is_experience_eligible(j.title, j.description)]
+
     source_counts = {}
-    for j in all_jobs:
+    for j in valid_jobs:
         s = (j.source or "").lower()
         source_counts[s] = source_counts.get(s, 0) + 1
 
-    sorted_jobs = sorted(all_jobs, key=job_sort_key)[:150]
+    sorted_jobs = sorted(valid_jobs, key=job_sort_key)[:150]
     user_states = {
         s.job_id: s for s in db.query(UserJobState).filter_by(session_id=session_id).all()
     }
@@ -268,8 +275,8 @@ def dashboard(request: Request, response: Response, db: Session = Depends(get_db
     habits = list_habits(db, session_id=session_id)
     tasks = db.query(Task).filter_by(session_id=session_id, day=date.today()).order_by(Task.id.desc()).all()
     runs = db.query(AgentRun).order_by(AgentRun.created_at.desc()).limit(6).all()
-    total_jobs = db.query(Job).count()
-    new_jobs = db.query(Job).filter_by(status="New").count()
+    total_jobs = len(valid_jobs)
+    new_jobs = sum(1 for j in valid_jobs if getattr(j, "status", "New") == "New")
 
     active_resume = get_active_resume_profile(session_id=session_id, db=db)
     available_resumes = get_available_resumes(session_id=session_id, db=db)

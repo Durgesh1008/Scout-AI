@@ -146,11 +146,26 @@ Provide a sharp, 1-2 sentence engineering/mindset tip for high performance.
 Keep the total message punchy, professional, and directly actionable.
 """
 
-    return generate(
-        prompt,
-        system="You are Scout-AI, an executive personal career and productivity assistant.",
-        temperature=0.3
-    )
+    try:
+        return generate(
+            prompt,
+            system="You are Scout-AI, an executive personal career and productivity assistant.",
+            temperature=0.3
+        )
+    except Exception as exc:
+        logger.warning(f"AI briefing generation failed: {exc}. Using structured fallback briefing.")
+        today_str = date.today().strftime('%A, %B %d, %Y')
+        return (
+            f"### 🌅 Daily Morning Briefing — {today_str}\n\n"
+            f"#### 🎯 1. DAILY FOCUS & TOP 5 PRIORITIES\n"
+            f"{priority_text}\n\n"
+            f"#### 💼 2. HIGH-MATCH JOB TARGETS FOR TODAY\n"
+            f"{job_text}\n\n"
+            f"#### ⚡ 3. HABIT & ROUTINE PROTOCOL\n"
+            f"{habit_text}\n\n"
+            f"#### 💡 4. ARCHITECTURAL / MINDSET INSIGHT\n"
+            f"Consistency compounds exponentially. Focus on shipping one clean piece of functionality, completing your core habit protocol, and submitting targeted applications today."
+        )
 
 
 def generate_eod_feedback(db: Session) -> str:

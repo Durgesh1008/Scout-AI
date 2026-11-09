@@ -19,9 +19,9 @@ def _extract_action(user_message: str) -> dict:
     msg_lower = msg.lower()
 
     # 1. Job search intents
-    if any(kw in msg_lower for kw in ["find job", "search job", "hunt job", "looking for job", "new job", "get jobs"]):
+    if any(kw in msg_lower for kw in ["find job", "findjobs", "findjob", "search job", "searchjobs", "hunt job", "huntjobs", "looking for job", "new job", "get jobs", "getjob", "getjobs"]):
         # Extract query if user said "find python jobs" or "find jobs for MERN"
-        query = re.sub(r"^(?:please\s+)?(?:find|search|hunt|look for|get)\s+(?:me\s+)?(?:some\s+)?(?:jobs?\s+(?:for|in)?|new\s+jobs?\s*)?", "", msg, flags=re.I).strip()
+        query = re.sub(r"^(?:please\s+)?(?:find|search|hunt|look for|get)\s*(?:me\s+)?(?:some\s+)?(?:jobs?\s*(?:for|in)?|new\s*jobs?\s*)?", "", msg, flags=re.I).strip()
         return {"action": "hunt_jobs", "query": query}
 
     # 2. View saved jobs

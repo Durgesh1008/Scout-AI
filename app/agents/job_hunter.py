@@ -339,32 +339,80 @@ def is_location_eligible(location: str, remote: bool = False, allow_out_of_india
 
 def is_experience_eligible(title: str, desc: str, user_exp_months: int = 3) -> bool:
     """
-    Candidate has ~3 months internship experience (fresher / entry level).
-    Strictly filter out senior roles, management roles, non-tech roles, and jobs demanding 2+ years of experience.
+    Candidate has ~0-2 years experience (intern / fresher / entry level).
+    Strictly filters out:
+    1. Non-tech roles
+    2. Senior / Lead / Principal / Architect / Management roles in title and description
+    3. Any job demanding 3+, 4+, 5+, 6+ or higher years of experience
+    4. Mid-senior year ranges (e.g. 2-5 yrs, 3-5 yrs, 4-6 yrs, 5-8 yrs)
+    5. Minimum experience requirements >= 3 years
+    6. Non-software or academic roles
     """
-    title_low = title.lower()
-    desc_low = desc.lower()
+    title_low = (title or "").lower().strip()
+    desc_low = (desc or "").lower().strip()
+    combo = f"{title_low} {desc_low}"
 
     # 1. Reject non-tech roles
     for non_tech in NON_TECH_ROLE_EXCLUSIONS:
         if re.search(rf"\b{re.escape(non_tech.strip())}\b", title_low):
             return False
 
-    # 2. Reject senior/lead/management roles
+    # 2. Reject senior/lead/management roles in title
     for senior_word in SENIOR_ROLE_EXCLUSIONS:
         if re.search(rf"\b{re.escape(senior_word.strip())}\b", title_low):
             return False
+
+    if re.search(r"\b(?:sr\.?|senior|lead|principal|staff|architect|director|vp|vice\s+president|head\s+of|manager|chief|partner\s+engineer)\b", title_low):
+        return False
 
     # 3. Reject academic / postdoc / foreign language markers in title
     for academic in FOREIGN_LANGUAGE_OR_ACADEMIC_EXCLUSIONS:
         if academic.strip() in title_low:
             return False
 
-    # 4. Reject descriptions demanding 2+ or more years of experience
-    if re.search(r"\b(?:[2-9]|1[0-5])\+?\s*(?:years?|yrs?)(?:\s+of)?\s+experience", desc_low):
+    # 4. Reject postings explicitly hiring senior/lead roles in description
+    if re.search(r"\b(?:looking for|seeking|hiring|we need)\s+(?:an?\s+)?(?:senior|lead|principal|staff|architect)\b", desc_low):
+        return False
+    if re.search(r"\b(?:role|position|job title|level)\s*[:=-]\s*(?:senior|lead|principal|staff|architect)\b", desc_low):
         return False
 
-    # 5. Must be a software/engineering/developer role (word bounded to prevent false positives)
+    # 5. Reject year ranges requiring 3+ or higher minimum, or 2 to 4+ years (e.g. 2-5 yrs, 3-5 yrs, 4-6 yrs, 5-8 yrs)
+    range_match = re.search(r"\b([0-9]|1\d)\s*(?:-|–|to)\s*([0-9]|1\d)\s*(?:years?|yrs?|yr)\b", combo)
+    if range_match:
+        low = int(range_match.group(1))
+        high = int(range_match.group(2))
+        if low >= 3 or (low >= 2 and high >= 4):
+            return False
+
+    # 6. Reject explicit 3+, 4+, 5+, 6+, etc. plus years (e.g. "3+ years", "4+ yrs", "5+ years", "6+ yr")
+    if re.search(r"\b([3-9]|1\d|20)\s*\+\s*(?:years?|yrs?|yr)\b", combo):
+        return False
+
+    # 7. Reject minimum 3+ years / at least 3 years (e.g. "minimum 3 years", "min 5 yrs", "at least 3 years")
+    if re.search(r"\b(?:minimum|min\.?|at least)\s+(?:of\s+)?([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b", combo):
+        return False
+
+    # 8. Reject experience labels demanding 3+ years (e.g. "Experience: 5+ years", "Exp: 3-5 yrs", "Experience required: 4 years")
+    if re.search(r"\b(?:experience|exp)\s*(?:required|needed|level)?\s*[:=-]\s*([3-9]|1\d|20)", combo):
+        return False
+
+    # 9. Reject requirement phrasing with 3+ years (e.g. "requires 3+ years", "must have 5 years", "seeking 4 years")
+    if re.search(r"\b(?:must have|requires?|seeking|needs?)\s+(?:at least\s+|a minimum of\s+)?([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b", combo):
+        return False
+
+    # 10. Reject intermediate word experience patterns (e.g. "5 years of professional experience", "3+ years hands-on experience")
+    if re.search(r"\b([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b(?:\s+(?:of\s+)?(?:relevant|professional|hands[- ]on|industry|software|development|work|prior|practical))?\s+experience\b", combo):
+        return False
+
+    # 11. Reject tech experience phrases (e.g. "5+ years in React", "3 years with Node", "4 years building APIs")
+    if re.search(r"\b([3-9]|1\d|20)\+?\s*(?:years?|yrs?|yr)\b\s+(?:in|with|working|building|developing|designing|architecting)\b", combo):
+        return False
+
+    # 12. Reject parenthetical year specification in title (e.g. "( 2 - 5 Years)", "(3+ years)", "(5 years)")
+    if re.search(r"\(\s*([2-9]|1\d)\+?\s*(?:-|–|to)?\s*\d*\s*(?:years?|yrs?|yr)\s*\)", title_low):
+        return False
+
+    # 13. Must be a software/engineering/developer role (word bounded)
     tech_patterns = [
         r"\bdeveloper\b", r"\bsoftware\b", r"\bengineer\b", r"\bfull\s*stack\b",
         r"\bbackend\b", r"\bfrontend\b", r"\bmern\b", r"\breact\b", r"\bnode\b",
@@ -817,8 +865,10 @@ def export_jobs_to_csv(jobs: List[Job], csv_path: Optional[str] = None):
 def cleanup_ineligible_jobs(db: Session, user_exp_months: int = 3) -> int:
     """
     Prunes jobs that are not software engineering, are senior/manager roles,
-    or require 2+ years of experience.
+    or require 3+ years of experience (or mid-senior ranges).
+    Also removes corresponding UserJobState records.
     """
+    from app.database import UserJobState
     all_jobs = db.query(Job).all()
     removed = 0
     kept_jobs = []
@@ -827,6 +877,10 @@ def cleanup_ineligible_jobs(db: Session, user_exp_months: int = 3) -> int:
         exp_ok = is_experience_eligible(j.title, j.description, user_exp_months)
 
         if not exp_ok:
+            try:
+                db.query(UserJobState).filter_by(job_id=j.id).delete()
+            except Exception:
+                pass
             db.delete(j)
             removed += 1
         else:
@@ -834,8 +888,12 @@ def cleanup_ineligible_jobs(db: Session, user_exp_months: int = 3) -> int:
 
     db.commit()
     if kept_jobs:
-        export_jobs_to_csv(kept_jobs)
-    logger.info(f"Cleaned up {removed} ineligible jobs.")
+        try:
+            export_jobs_to_csv(kept_jobs)
+        except Exception as e:
+            logger.warning(f"Failed to export jobs to CSV: {e}")
+    if removed > 0:
+        logger.info(f"Cleaned up {removed} ineligible senior/experienced jobs.")
     return removed
 
 
