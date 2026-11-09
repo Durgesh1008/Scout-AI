@@ -747,7 +747,10 @@ async def plugin_run(name: str, request: Request):
 @app.get("/api/health")
 def health_check():
     connected = check_connection()
+    model = settings.gemini_model if settings.llm_provider == "gemini" else settings.groq_model
+    if "2.5" in model:
+        model = "gemini-1.5-flash"
     return {
         "connected": connected,
-        "model": settings.gemini_model if settings.llm_provider == "gemini" else settings.groq_model
+        "model": model
     }
