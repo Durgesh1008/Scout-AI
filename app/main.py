@@ -240,6 +240,7 @@ def startup():
 
 
 @app.get("/", response_class=HTMLResponse)
+@app.head("/")
 @app.get("/jobs", response_class=HTMLResponse)
 @app.get("/chat", response_class=HTMLResponse)
 @app.get("/assistant", response_class=HTMLResponse)
@@ -776,6 +777,7 @@ async def plugin_run(name: str, request: Request):
 
 
 @app.get("/api/health")
+@app.head("/api/health")
 def health_check():
     connected = check_connection()
     model = settings.gemini_model if settings.llm_provider == "gemini" else settings.groq_model

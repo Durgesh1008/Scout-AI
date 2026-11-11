@@ -906,12 +906,12 @@ def cleanup_ineligible_jobs(db: Session, user_exp_months: int = 3) -> int:
             kept_jobs.append(j)
 
     db.commit()
-    if kept_jobs:
-        try:
-            export_jobs_to_csv(kept_jobs)
-        except Exception as e:
-            logger.warning(f"Failed to export jobs to CSV: {e}")
     if removed > 0:
+        if kept_jobs:
+            try:
+                export_jobs_to_csv(kept_jobs)
+            except Exception as e:
+                logger.warning(f"Failed to export jobs to CSV: {e}")
         logger.info(f"Cleaned up {removed} ineligible senior/experienced jobs.")
     return removed
 
