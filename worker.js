@@ -48,7 +48,18 @@ export default {
     });
 
     try {
-      const response = await fetch(proxyRequest);
+      let response = await fetch(proxyRequest);
+      // Auto-retry once if Render is waking up from sleep
+      if (response.status === 502 && ["GET", "HEAD"].includes(request.method)) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        response = await fetch(
+          new Request(targetUrl, {
+            method: request.method,
+            headers: forwardHeaders,
+            redirect: "manual"
+          })
+        );
+      }
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
