@@ -2,14 +2,17 @@ name: Render Keep-Alive Ping
 
 on:
   schedule:
-    # Run every 14 minutes to prevent Render Free Tier from spinning down
-    - cron: '*/14 * * * *'
+    # Run every 10 minutes to stay well within Render's 15-minute inactivity limit
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render Backend
+      - name: Ping Render Backend and Worker
         run: |
-          curl -s -f https://scout-ai-1-0gs9.onrender.com/api/health || true
+          echo "Pinging Render directly..."
+          curl -s -o /dev/null -w "Render Status: %{http_code}\n" https://scout-ai-1-0gs9.onrender.com/api/health || true
+          echo "Pinging Cloudflare Worker..."
+          curl -s -o /dev/null -w "Worker Status: %{http_code}\n" https://scout-ai.dk1570801.workers.dev/api/health || true
