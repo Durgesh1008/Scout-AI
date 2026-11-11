@@ -6,7 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import SessionLocal, Job, AgentRun
+from app.database import SessionLocal, Job, AgentRun, init_db
 from app.agents.job_hunter import hunt_jobs
 from app.agents.email_drafter import generate_draft, save_local_draft, create_gmail_draft
 from app.agents.routine_manager import ensure_habits, generate_morning_briefing
@@ -27,6 +27,7 @@ def run_morning_pipeline() -> dict:
     5. Dispatch alerts via Telegram, Discord, and Windows Desktop Notification
     """
     logger.info("--- Starting Autonomous Morning Pipeline ---")
+    init_db()
     db: Session = SessionLocal()
     pipeline_result = {
         "timestamp": datetime.now().isoformat(),
@@ -99,8 +100,11 @@ def run_morning_pipeline() -> dict:
         db.rollback()
         err_msg = f"Morning pipeline failed: {exc}"
         logger.error(err_msg)
-        db.add(AgentRun(agent="morning_pipeline", status="error", summary=str(exc)[:2000]))
-        db.commit()
+        try:
+            db.add(AgentRun(agent="morning_pipeline", status="error", summary=str(exc)[:2000]))
+            db.commit()
+        except Exception as audit_err:
+            logger.warning(f"Could not record AgentRun audit: {audit_err}")
         pipeline_result["status"] = "error"
         pipeline_result["error"] = str(exc)
 
@@ -112,6 +116,7 @@ def run_morning_pipeline() -> dict:
 
 def run_hourly_cleanup():
     """Auto-deletes unreviewed jobs older than 18 hours based on Indian Standard Time."""
+    init_db()
     db: Session = SessionLocal()
     try:
         from app.agents.job_hunter import cleanup_expired_jobs
@@ -126,6 +131,7 @@ def run_hourly_cleanup():
 
 def start_scheduler():
     """Start background scheduler on the configured morning time and hourly cleanup."""
+    init_db()
     if scheduler.running:
         return
 
@@ -155,6 +161,7 @@ def start_scheduler():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    init_db()
     if "--now" in sys.argv:
         print("Executing Autonomous Morning Pipeline immediately...")
         res = run_morning_pipeline()
